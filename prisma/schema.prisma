@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,10 +7,108 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Tambahkan model/tabel kamu di bawah ini, contoh:
-// model User {
-//   id        Int      @id @default(autoincrement())
-//   email     String   @unique
-//   name      String?
-//   createdAt DateTime @default(now())
-// }
+enum BookingStatus {
+  PENDING
+  UPCOMING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+model User {
+  id        String    @id @default(uuid())
+  fullName  String
+  email     String    @unique
+  phone     String?
+  password  String?
+  role      String    @default("GUEST") // GUEST | ADMIN
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Room {
+  id          String    @id @default(uuid())
+  slug        String    @unique // contoh: "superior", "deluks", "family-suite"
+  name        String
+  category    String
+  description String
+  sizeSqm     Int
+  bedType     String
+  maxGuests   Int
+  basePrice   Int       // harga per malam dalam Rupiah (misal: 850000)
+  totalUnits  Int       @default(5)
+  images      String[]  // array URL foto kamar
+  amenities   String[]  // daftar fasilitas kamar
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Promo {
+  id              String    @id @default(uuid())
+  code            String    @unique // contoh: "NESTRALAMA", "AWAL15"
+  title           String
+  description     String
+  discountPercent Int       // contoh: 20 untuk 20%
+  minNights       Int       @default(1)
+  validUntil      DateTime
+  isActive        Boolean   @default(true)
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+}
+
+model Booking {
+  id             String        @id @default(uuid())
+  bookingCode    String        @unique // contoh: "NST-261016-0842"
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id])
+  roomId         String
+  room           Room          @relation(fields: [roomId], references: [id])
+  promoId        String?
+  promo          Promo?        @relation(fields: [promoId], references: [id])
+
+  // Detail Tamu (Step 2 Checkout)
+  guestFirstName String
+  guestLastName  String
+  guestEmail     String
+  guestPhone     String
+  arrivalTime    String?
+  specialRequest String?
+
+  // Detail Menginap & Rincian Biaya
+  checkIn        DateTime
+  checkOut       DateTime
+  nights         Int
+  adults         Int           @default(2)
+  roomSubtotal   Int
+  discountAmount Int           @default(0)
+  taxAmount      Int           // 11% pajak & layanan
+  totalAmount    Int
+
+  // Status & Pembayaran (Step 3 & 4)
+  status         BookingStatus @default(UPCOMING)
+  paymentStatus  PaymentStatus @default(PAID)
+  paymentMethod  String?       // contoh: "BCA Virtual Account"
+  paymentRef     String?       // contoh: "BCA-071026-0842"
+  paidAt         DateTime?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model ContactMessage {
+  id          String   @id @default(uuid())
+  fullName    String
+  email       String
+  topic       String
+  bookingCode String?
+  message     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
