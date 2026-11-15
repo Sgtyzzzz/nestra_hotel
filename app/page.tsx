@@ -2,113 +2,125 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-// Data Dummy sementara sebelum disambungkan ke API NestJS (/api/rooms)
-const ROOMS_DATA = [
+const FALLBACK_IMG =
+  "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80";
+
+const HOME_ROOMS = [
   {
-    id: "superior",
+    slug: "kamar-superior",
     name: "Superior",
-    specs: "24 m² • 1 Queen Bed • 2 Tamu",
-    price: "Rp650.000",
-    image: "/images/room-superior.jpg",
-  },
-  {
-    id: "deluxe",
-    name: "Deluxe",
-    specs: "32 m² • 1 King Bed • 2 Tamu",
+    specs: "28 m² • 2 Tamu • Twin / Double",
     price: "Rp850.000",
-    image: "/images/room-deluxe.jpg",
+    image:
+      "https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=1000&q=80",
   },
   {
-    id: "family",
-    name: "Kamar Keluarga",
-    specs: "45 m² • 2 Queen Bed • 4 Tamu",
+    slug: "kamar-deluks",
+    name: "Deluks",
+    specs: "36 m² • 2 Tamu • King",
     price: "Rp1.150.000",
-    image: "/images/room-family.jpg",
+    image:
+      "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80",
+  },
+  {
+    slug: "kamar-keluarga",
+    name: "Kamar Keluarga",
+    specs: "48 m² • 4 Tamu • 2 Queen",
+    price: "Rp1.650.000",
+    image:
+      "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1000&q=80",
   },
 ];
 
-const FAQ_DATA = [
+const FAQS = [
   {
-    q: "Kapan waktu check-in dan check-out?",
-    a: "Waktu check-in dimulai pukul 14.00 WIB dan check-out maksimal pukul 12.00 WIB. Permintaan check-in lebih awal menyesuaikan ketersediaan kamar.",
+    q: "Kapan waktu masuk dan keluar?",
+    a: "Waktu masuk (check-in) dimulai pukul 14.00 WIB, dan waktu keluar (check-out) paling lambat pukul 12.00 WIB.",
   },
   {
     q: "Apakah harga sudah termasuk sarapan?",
-    a: "Beberapa paket kamar sudah termasuk sarapan untuk 2 orang. Detail fasilitas sarapan tertera jelas saat Anda memilih tipe kamar.",
+    a: "Ya, seluruh pemesanan langsung di situs resmi Nestra Hotel sudah termasuk sarapan pagi hangat di Restoran Serambi.",
   },
   {
-    q: "Bagaimana kebijakan pembatalan?",
-    a: "Pembatalan gratis dapat dilakukan hingga 24 jam sebelum tanggal check-in untuk pemesanan langsung melalui situs web resmi Nestra Hotel.",
+    q: "Bagaimana kebijakan pembatalannya?",
+    a: "Pembatalan gratis dapat dilakukan hingga 24 jam sebelum jadwal kedatangan melalui halaman Reservasi Saya.",
   },
   {
-    q: "Apakah tersedia area parkir untuk kendaraan?",
-    a: "Ya, kami menyediakan area parkir bawah tanah dan layanan valet gratis khusus untuk tamu yang menginap.",
+    q: "Apakah tersedia parkir dan akses untuk keluarga?",
+    a: "Tersedia area parkir pribadi gratis di dalam lingkungan hotel serta akses ramah kursi roda dan keluarga.",
   },
 ];
 
 export default function HomePage() {
+  const router = useRouter();
+  const [checkIn, setCheckIn] = useState("2026-10-16");
+  const [checkOut, setCheckOut] = useState("2026-10-18");
+  const [guests, setGuests] = useState("2 Dewasa • 1 Kamar");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [bookingFilter, setBookingFilter] = useState({
-    location: "Nestra Hotel Yogyakarta",
-    checkIn: "2026-11-20",
-    checkOut: "2026-11-22",
-    guests: "2 Dewasa, 1 Kamar",
-  });
+
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    if (e.currentTarget.src !== FALLBACK_IMG) {
+      e.currentTarget.src = FALLBACK_IMG;
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Nanti diarahkan ke halaman /kamar dengan query params
-    console.log("Mencari kamar:", bookingFilter);
+    router.push(`/kamar?checkIn=${checkIn}&checkOut=${checkOut}`);
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* 1. NAVBAR */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-stone-200">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+    <div className="min-h-screen bg-white text-[#0F2334] font-sans">
+      {/* 1. NAVBAR ATAS PUTIH SESUAI FIGMA */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-stone-200/80">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between text-xs">
+          {/* Logo Kiri */}
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[#0F2334] text-white flex items-center justify-center font-serif font-bold text-lg rounded-sm">
+            <div className="w-8 h-8 border border-[#C6A267] text-[#0F2334] flex items-center justify-center font-serif font-bold text-lg">
               N
             </div>
             <div className="leading-none">
-              <span className="block font-bold tracking-wider text-sm text-[#0F2334]">
+              <span className="block font-bold tracking-[0.16em] text-xs text-[#0F2334]">
                 NESTRA
               </span>
-              <span className="text-[10px] tracking-[0.2em] text-stone-500">
+              <span className="text-[9px] tracking-[0.22em] text-stone-500">
                 HOTEL
               </span>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm text-stone-600">
-            <Link href="/" className="text-[#0F2334] font-semibold">
+          {/* Menu Tengah */}
+          <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-stone-700">
+            <Link href="/" className="font-bold text-[#0F2334]">
               Beranda
             </Link>
             <Link href="/kamar" className="hover:text-[#0F2334] transition">
               Kamar
             </Link>
             <Link href="/fasilitas" className="hover:text-[#0F2334] transition">
-              Fasilitas & Layanan
+              Fasilitas &amp; Pengalaman
             </Link>
             <Link href="/penawaran" className="hover:text-[#0F2334] transition">
               Penawaran
             </Link>
-            <Link href="/tentang" className="hover:text-[#0F2334] transition">
-              Tentang Kami
+            <Link href="/kontak" className="hover:text-[#0F2334] transition">
+              Hubungi Kami
             </Link>
           </nav>
 
-          <div className="flex items-center gap-5 text-sm">
+          {/* Aksi Kanan */}
+          <div className="flex items-center gap-4">
             <Link
               href="/reservasi-saya"
-              className="hidden sm:inline text-stone-600 hover:text-[#0F2334]"
+              className="hidden sm:inline text-xs font-medium text-stone-700 hover:text-[#0F2334]"
             >
               Reservasi Saya
             </Link>
             <Link
               href="/kamar"
-              className="bg-[#0F2334] hover:bg-[#19354d] text-white px-5 py-2.5 rounded text-xs font-medium tracking-wide transition"
+              className="bg-[#0F2334] hover:bg-[#19354d] text-white text-xs font-semibold px-4 py-2 rounded transition"
             >
               Pesan Kamar
             </Link>
@@ -116,540 +128,664 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* 2. HERO SECTION & FLOATING BOOKING BAR */}
-      <section className="relative">
-        <div className="relative h-[540px] w-full bg-stone-800">
-          {/* Ganti src dengan gambar hero dari Figma */}
+      {/* 2. HERO BANNER + FLOATING SEARCH BAR */}
+      <section className="relative bg-[#0F2334] text-white">
+        <div className="relative min-h-[540px] flex items-center">
           <img
-            src="/images/hero-lobby.jpg"
-            alt="Interior Lobi Nestra Hotel"
-            className="w-full h-full object-cover brightness-[0.65]"
+            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80"
+            alt="Lobby Nestra Hotel Yogyakarta"
+            onError={handleImgError}
+            className="absolute inset-0 w-full h-full object-cover opacity-55"
           />
-          <div className="absolute inset-0 max-w-6xl mx-auto px-6 flex flex-col justify-center text-white">
-            <span className="text-xs uppercase tracking-[0.2em] text-amber-200/90 mb-3">
-              Boutique Sanctuary • Yogyakarta
-            </span>
-            <h1 className="font-serif text-4xl md:text-6xl max-w-xl leading-tight mb-4">
-              Singgah dengan tenang. Jelajahi dengan leluasa.
-            </h1>
-            <p className="text-sm font-medium text-stone-200 mb-1">
-              Your Stay, Made Simple.
-            </p>
-            <p className="text-xs md:text-sm text-stone-300 max-w-md leading-relaxed mb-6">
-              Kenyamanan modern yang dirancang hangat untuk istirahat terbaik
-              Anda di tengah jantung kota.
-            </p>
-            <div className="flex items-center gap-4 text-xs text-stone-300">
-              <span>• Wi-Fi Cepat & Stabil</span>
-              <span>• Check-in Fleksibel</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F2334]/90 via-[#0F2334]/65 to-[#0F2334]/35" />
+
+          <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 w-full">
+            <div className="max-w-xl space-y-4">
+              <span className="block text-[10px] uppercase tracking-[0.24em] text-[#E5C687] font-semibold">
+                NESTRA HOTEL • YOGYAKARTA
+              </span>
+              <h1 className="font-serif text-4xl md:text-6xl leading-[1.12] text-white">
+                Singgah dengan tenang. Jelajahi dengan leluasa.
+              </h1>
+              <p className="font-serif italic text-lg text-[#E5C687]">
+                Your Stay, Made Simple.
+              </p>
+              <p className="text-xs md:text-sm text-stone-100 leading-relaxed max-w-md">
+                Kenyamanan modern dengan sentuhan hangat Yogyakarta, tertata
+                untuk perjalanan yang bernilai.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-5 pt-3 text-xs">
+                <Link
+                  href="/kamar"
+                  className="text-white font-semibold underline underline-offset-4 hover:text-[#E5C687]"
+                >
+                  • Jelajahi Kamar
+                </Link>
+                <Link
+                  href="/penawaran"
+                  className="text-stone-200 hover:text-white transition"
+                >
+                  Lihat Penawaran Musim Ini
+                </Link>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Booking Search Card */}
-        <div className="max-w-6xl mx-auto px-6 -mt-12 relative z-10">
+        {/* Search Bar Mengambang di Bawah Hero */}
+        <div className="relative z-20 max-w-7xl mx-auto px-6 -mt-10 pb-6">
           <form
             onSubmit={handleSearch}
-            className="bg-white p-5 rounded-md shadow-lg border border-stone-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end"
+            className="bg-white text-[#0F2334] rounded-md shadow-lg border border-stone-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end"
           >
-            <div>
-              <label className="block text-[11px] font-medium text-stone-500 mb-1.5">
-                Lokasi
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold text-stone-500 mb-1">
+                Kota
               </label>
               <input
                 type="text"
-                value={bookingFilter.location}
-                onChange={(e) =>
-                  setBookingFilter({ ...bookingFilter, location: e.target.value })
-                }
-                className="w-full border border-stone-200 rounded px-3 py-2 text-xs text-stone-800 focus:outline-none focus:border-[#0F2334]"
+                readOnly
+                value="Nestra Hotel Yogyakarta"
+                className="w-full border border-stone-200 bg-stone-50 rounded px-3 py-2 text-xs font-medium text-[#0F2334]"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-medium text-stone-500 mb-1.5">
+
+            <div className="lg:col-span-3">
+              <label className="block text-[10px] font-semibold text-stone-500 mb-1">
                 Tanggal Masuk
               </label>
               <input
                 type="date"
-                value={bookingFilter.checkIn}
-                onChange={(e) =>
-                  setBookingFilter({ ...bookingFilter, checkIn: e.target.value })
-                }
-                className="w-full border border-stone-200 rounded px-3 py-2 text-xs text-stone-800 focus:outline-none focus:border-[#0F2334]"
+                value={checkIn}
+                onChange={(e) => setCheckIn(e.target.value)}
+                className="w-full border border-stone-200 rounded px-3 py-2 text-xs font-medium text-[#0F2334] bg-white"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-medium text-stone-500 mb-1.5">
+
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold text-stone-500 mb-1">
                 Tanggal Keluar
               </label>
               <input
                 type="date"
-                value={bookingFilter.checkOut}
-                onChange={(e) =>
-                  setBookingFilter({ ...bookingFilter, checkOut: e.target.value })
-                }
-                className="w-full border border-stone-200 rounded px-3 py-2 text-xs text-stone-800 focus:outline-none focus:border-[#0F2334]"
+                value={checkOut}
+                onChange={(e) => setCheckOut(e.target.value)}
+                className="w-full border border-stone-200 rounded px-3 py-2 text-xs font-medium text-[#0F2334] bg-white"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-medium text-stone-500 mb-1.5">
-                Tamu & Kamar
+
+            <div className="lg:col-span-2">
+              <label className="block text-[10px] font-semibold text-stone-500 mb-1">
+                Tamu &amp; Kamar
               </label>
               <select
-                value={bookingFilter.guests}
-                onChange={(e) =>
-                  setBookingFilter({ ...bookingFilter, guests: e.target.value })
-                }
-                className="w-full border border-stone-200 rounded px-3 py-2 text-xs text-stone-800 focus:outline-none focus:border-[#0F2334]"
+                value={guests}
+                onChange={(e) => setGuests(e.target.value)}
+                className="w-full border border-stone-200 rounded px-3 py-2 text-xs font-medium text-[#0F2334] bg-white"
               >
-                <option>1 Dewasa, 1 Kamar</option>
-                <option>2 Dewasa, 1 Kamar</option>
-                <option>2 Dewasa, 2 Anak, 1 Kamar</option>
+                <option>2 Dewasa • 1 Kamar</option>
+                <option>1 Dewasa • 1 Kamar</option>
+                <option>4 Dewasa • 2 Kamar</option>
               </select>
             </div>
-            <button
-              type="submit"
-              className="w-full bg-[#0F2334] hover:bg-[#19354d] text-white py-2.5 px-4 rounded text-xs font-medium transition cursor-pointer"
-            >
-              Cari Kamar →
-            </button>
+
+            <div className="lg:col-span-2">
+              <button
+                type="submit"
+                className="w-full bg-[#0F2334] hover:bg-[#19354d] text-white text-xs font-semibold py-2.5 px-4 rounded transition cursor-pointer"
+              >
+                Cari Kamar →
+              </button>
+            </div>
           </form>
         </div>
       </section>
 
-      {/* 3. VALUE PROPOSITION ("Hal-hal sederhana, yang membuat betah.") */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pb-12 border-b border-stone-200">
-          <h2 className="font-serif text-3xl text-[#0F2334] max-w-xs leading-snug">
-            Hal-hal sederhana, yang membuat betah.
-          </h2>
-          <p className="text-xs md:text-sm text-stone-500 max-w-md leading-relaxed">
-            Dari kamar yang bersih hingga pelayanan yang hangat, kami merawat
-            detail kecil agar Anda bisa beristirahat tanpa gangguan.
-          </p>
+      {/* 3. HAL-HAL SEDERHANA, YANG MEMBUAT BETAH */}
+      <section className="max-w-7xl mx-auto px-6 py-16 space-y-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-5">
+            <h2 className="font-serif text-3xl text-[#0F2334] leading-snug">
+              Hal-hal sederhana, yang membuat betah.
+            </h2>
+          </div>
+          <div className="lg:col-span-7">
+            <p className="text-xs md:text-sm text-stone-600 leading-relaxed">
+              Detail kecil yang sering luput justru menjadi bagian paling
+              mengesankan dari menginap. Kami merancang Nestra untuk terasa
+              hangat, teratur, dan tidak rumit.
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 pt-10">
-          {[
-            {
-              title: "Dirancang higienis",
-              desc: "Standar kebersihan menyeluruh sebelum Anda tiba.",
-            },
-            {
-              title: "Nyaman tanpa berlebihan",
-              desc: "Kasur berkualitas dan pencahayaan hangat yang menenangkan.",
-            },
-            {
-              title: "Pagi yang lebih baik",
-              desc: "Sarapan segar pilihan lokal disajikan setiap hari.",
-            },
-            {
-              title: "Mulai sejak awal",
-              desc: "Proses reservasi ringkas dengan dukungan resepsionis 24 jam.",
-            },
-          ].map((item, idx) => (
-            <div key={idx} className="space-y-2">
-              <div className="w-7 h-7 rounded-full bg-[#F6F2EA] text-amber-800 flex items-center justify-center text-xs font-bold">
-                ✓
-              </div>
-              <h3 className="font-semibold text-sm text-[#0F2334]">
-                {item.title}
-              </h3>
-              <p className="text-xs text-stone-500 leading-relaxed">
-                {item.desc}
-              </p>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+          <div className="space-y-2">
+            <span className="text-sm text-[#9A7840]">📍</span>
+            <h3 className="text-xs font-bold text-[#0F2334]">
+              Di jantung Yogyakarta
+            </h3>
+            <p className="text-[11px] text-stone-600 leading-relaxed">
+              Dekat pusat budaya, kuliner lokal, dan stasiun utama kota.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm text-[#9A7840]">🛏</span>
+            <h3 className="text-xs font-bold text-[#0F2334]">
+              Nyaman tanpa berlebihan
+            </h3>
+            <p className="text-[11px] text-stone-600 leading-relaxed">
+              Kamar tenang, tempat tidur berkualitas, dan tata ruang fungsional.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm text-[#9A7840]">☕</span>
+            <h3 className="text-xs font-bold text-[#0F2334]">
+              Pagi yang lebih baik
+            </h3>
+            <p className="text-[11px] text-stone-600 leading-relaxed">
+              Sarapan lokal segar disajikan hangat setiap pagi.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm text-[#9A7840]">🤍</span>
+            <h3 className="text-xs font-bold text-[#0F2334]">
+              Melayani sepenuh hati
+            </h3>
+            <p className="text-[11px] text-stone-600 leading-relaxed">
+              Kecepatan respons resepsionis dan keramahtamahan tulus.
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* 4. ROOM SHOWCASE ("Kamar yang pas untuk Anda.") */}
-      <section className="bg-[#F6F2EA] py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
-            <div>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-semibold">
-                Pilihan Akomodasi
+      {/* 4. KAMAR YANG PAS UNTUK ANDA (LATAR KREM HANGAT #F6F1E9) */}
+      <section className="bg-[#F6F1E9] py-20 px-6">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="space-y-1.5">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7840] font-bold">
+                AKOMODASI KAMI
               </span>
-              <h2 className="font-serif text-3xl text-[#0F2334] mt-1">
+              <h2 className="font-serif text-3xl text-[#0F2334]">
                 Kamar yang pas untuk Anda.
               </h2>
-              <p className="text-xs text-stone-500 mt-1">
-                Setiap ruang dirancang untuk ketenangan setelah seharian beraktivitas.
+              <p className="text-xs text-stone-600">
+                Untuk sendiri, bersama pasangan, atau perjalanan bersama
+                keluarga kecil.
               </p>
             </div>
             <Link
               href="/kamar"
-              className="inline-flex items-center gap-2 border border-stone-300 bg-white px-4 py-2 rounded text-xs font-medium text-[#0F2334] hover:bg-stone-50 transition self-start"
+              className="bg-white border border-stone-300 hover:border-[#0F2334] text-[#0F2334] text-xs font-semibold px-4 py-2 rounded transition self-start sm:self-auto"
             >
               Lihat semua kamar →
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {ROOMS_DATA.map((room) => (
+            {HOME_ROOMS.map((room) => (
               <div
-                key={room.id}
-                className="bg-white rounded-md overflow-hidden border border-stone-200/70 flex flex-col"
+                key={room.slug}
+                className="bg-white rounded-md overflow-hidden border border-stone-200/80 shadow-xs flex flex-col justify-between"
               >
-                <div className="h-52 bg-stone-200 overflow-hidden">
-                  <img
-                    src={room.image}
-                    alt={room.name}
-                    className="w-full h-full object-cover hover:scale-105 transition duration-500"
-                  />
-                </div>
-                <div className="p-5 flex-1 flex flex-col justify-between">
-                  <div>
+                <div>
+                  <div className="aspect-[16/10] bg-stone-200 overflow-hidden">
+                    <img
+                      src={room.image}
+                      alt={room.name}
+                      onError={handleImgError}
+                      className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                    />
+                  </div>
+                  <div className="p-5 space-y-1.5">
                     <h3 className="font-serif text-xl text-[#0F2334]">
                       {room.name}
                     </h3>
-                    <p className="text-xs text-stone-500 mt-1">{room.specs}</p>
+                    <p className="text-[11px] text-stone-500">{room.specs}</p>
                   </div>
-                  <div className="mt-6 pt-4 border-t border-stone-100 flex items-center justify-between">
-                    <div>
-                      <span className="block text-[10px] text-stone-400">
-                        Mulai dari
+                </div>
+
+                <div className="px-5 pb-5 pt-3 border-t border-stone-100 flex items-end justify-between">
+                  <div>
+                    <span className="block text-[10px] text-stone-400">
+                      Mulai dari
+                    </span>
+                    <span className="text-sm font-bold text-[#0F2334]">
+                      {room.price}
+                      <span className="text-[11px] font-normal text-stone-500">
+                        {" "}
+                        / malam
                       </span>
-                      <span className="font-bold text-sm text-[#0F2334]">
-                        {room.price}
-                      </span>
-                      <span className="text-[10px] text-stone-400"> /malam</span>
-                    </div>
-                    <Link
-                      href={`/kamar/${room.id}`}
-                      className="text-xs font-semibold text-[#0F2334] hover:underline"
-                    >
-                      Lihat detail →
-                    </Link>
+                    </span>
                   </div>
+                  <Link
+                    href={`/kamar/${room.slug}`}
+                    className="text-xs font-semibold text-[#0F2334] hover:text-[#9A7840]"
+                  >
+                    Lihat kamar →
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-stone-500 mt-6">
-            *Harga dapat berubah sesuai tanggal menginap dan ketersediaan kamar.
+
+          <p className="text-[10px] text-stone-500">
+            * Harga sudah termasuk pajak &amp; layanan • Sarapan tersedia
+            berdasarkan pilihan paket.
           </p>
         </div>
       </section>
 
-      {/* 5. FACILITIES ("Luangkan waktu. Nikmati ritmenya.") */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="h-[380px] rounded-md overflow-hidden bg-stone-200">
+      {/* 5. LUANGKAN WAKTU. NIKMATI RITMENYA. */}
+      <section className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <div className="lg:col-span-6">
+          <div className="aspect-[4/3] rounded-md overflow-hidden bg-stone-200 shadow-sm">
             <img
-              src="/images/pool-courtyard.jpg"
-              alt="Kolam Renang Nestra Hotel"
+              src="https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&w=1100&q=80"
+              alt="Kolam Renang Taman Nestra"
+              onError={handleImgError}
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="space-y-4">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-semibold">
-              Suasana & Fasilitas
+        </div>
+
+        <div className="lg:col-span-6 space-y-4">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7840] font-bold">
+            FASILITAS &amp; SUASANA
+          </span>
+          <h2 className="font-serif text-3xl md:text-4xl text-[#0F2334] leading-snug">
+            Luangkan waktu. Nikmati ritmenya.
+          </h2>
+          <p className="text-xs md:text-sm text-stone-600 leading-relaxed">
+            Berenang di antara agenda, sarapan santai tanpa tergesa, atau
+            menyesap kopi sore di sudut yang tenang.
+          </p>
+          <p className="text-xs font-medium text-[#0F2334]">
+            Kolam Renang Taman • Restoran &amp; Sarapan Hangat • Lounge Tenang
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/fasilitas"
+              className="inline-block border border-stone-300 hover:border-[#0F2334] text-[#0F2334] text-xs font-semibold px-4 py-2.5 rounded transition"
+            >
+              Jelajahi Fasilitas →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. ADA ALASAN UNTUK TINGGAL LEBIH LAMA (PROMO CARDS) */}
+      <section className="bg-[#F6F1E9] py-20 px-6">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7840] font-bold">
+              PENAWARAN SPESIAL
             </span>
-            <h2 className="font-serif text-3xl text-[#0F2334] leading-snug">
-              Luangkan waktu. Nikmati ritmenya.
+            <h2 className="font-serif text-3xl text-[#0F2334]">
+              Ada alasan untuk tinggal lebih lama.
             </h2>
-            <p className="text-xs md:text-sm text-stone-600 leading-relaxed">
-              Mulai pagi dengan berenang santai, bekerja dari lounge yang tenang,
-              atau sekadar menikmati kopi sore di taman dalam hotel kami.
-            </p>
-            <p className="text-xs text-stone-500">
-              Kolam Renang Terbuka • Restoran & Kafe • Ruang Kerja Tenang • Layanan Kamar 24 Jam
-            </p>
-            <div className="pt-2">
-              <Link
-                href="/fasilitas"
-                className="inline-block border border-stone-300 px-5 py-2.5 rounded text-xs font-medium text-[#0F2334] hover:bg-stone-50 transition"
-              >
-                Jelajahi Fasilitas →
-              </Link>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            {/* Foto Sarapan Kiri */}
+            <div className="lg:col-span-4 rounded-md overflow-hidden bg-stone-200 min-h-[240px]">
+              <img
+                src="https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?auto=format&fit=crop&w=900&q=80"
+                alt="Sarapan Santai Nestra Hotel"
+                onError={handleImgError}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Kartu Gelap Tengah (Tulisan Putih & Emas Jelas!) */}
+            <div className="lg:col-span-5 bg-[#0F2334] text-white rounded-md p-7 flex flex-col justify-between space-y-5">
+              <div className="space-y-2.5">
+                <span className="inline-block bg-[#C6A267] text-[#0F2334] text-[10px] font-bold px-2.5 py-0.5 rounded">
+                  Hemat 15%
+                </span>
+                <h3 className="font-serif text-2xl text-white">
+                  Akhir pekan, tanpa terburu-buru.
+                </h3>
+                <p className="text-xs text-stone-200 leading-relaxed">
+                  Menginap 2 malam atau lebih dan nikmati sarapan pagi untuk
+                  berdua serta waktu check-out yang lebih panjang.
+                </p>
+                <p className="text-sm font-bold text-[#E5C687] pt-1">
+                  Deluks • Rp950.000 / malam
+                </p>
+              </div>
+
+              <div>
+                <Link
+                  href="/penawaran"
+                  className="inline-block bg-white hover:bg-stone-100 text-[#0F2334] text-xs font-bold px-4 py-2 rounded transition"
+                >
+                  Pilih paket menginap
+                </Link>
+              </div>
+            </div>
+
+            {/* Kartu Krem Kanan */}
+            <div className="lg:col-span-3 bg-[#EAE2D3] text-[#0F2334] rounded-md p-7 flex flex-col justify-between space-y-5">
+              <div className="space-y-2.5">
+                <h3 className="font-serif text-xl text-[#0F2334]">
+                  Pesan langsung, lebih tenang.
+                </h3>
+                <p className="text-xs text-stone-700 leading-relaxed">
+                  Harga terbaik, tanpa perantara, dan prioritas permintaan
+                  kamar.
+                </p>
+              </div>
+              <div>
+                <Link
+                  href="/penawaran"
+                  className="text-xs font-bold text-[#0F2334] hover:underline"
+                >
+                  Gunakan kode: NESTRA15 →
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 6. SPECIAL OFFERS ("Ada alasan untuk tinggal lebih lama.") */}
-      <section className="max-w-6xl mx-auto px-6 pb-20">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-semibold">
-          Penawaran Spesial
-        </span>
-        <h2 className="font-serif text-3xl text-[#0F2334] mt-1 mb-8">
-          Ada alasan untuk tinggal lebih lama.
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-          <div className="md:col-span-4 rounded-md overflow-hidden bg-stone-200 min-h-[220px]">
-            <img
-              src="/images/breakfast-promo.jpg"
-              alt="Sarapan di Nestra Hotel"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          <div className="md:col-span-5 bg-[#0F2334] text-white p-7 rounded-md flex flex-col justify-between">
-            <div>
-              <span className="inline-block bg-amber-200/20 text-amber-200 text-[10px] px-2.5 py-0.5 rounded uppercase tracking-wider mb-3">
-                Paket Akhir Pekan
-              </span>
-              <h3 className="font-serif text-2xl mb-2">
-                Akhir pekan, tanpa terburu-buru.
-              </h3>
-              <p className="text-xs text-stone-300 leading-relaxed">
-                Menginap minimal 2 malam di akhir pekan, termasuk sarapan untuk
-                dua orang dan late check-out hingga pukul 14.00.
-              </p>
-            </div>
-            <div className="mt-6">
-              <p className="text-xs text-amber-200 font-semibold mb-3">
-                Mulai dari Rp1.250.000 / 2 malam
-              </p>
-              <Link
-                href="/penawaran"
-                className="inline-block bg-white text-[#0F2334] px-4 py-2 rounded text-xs font-semibold hover:bg-stone-100 transition"
-              >
-                Pilih Paket Ini
-              </Link>
-            </div>
-          </div>
-
-          <div className="md:col-span-3 bg-[#EFE9DD] p-7 rounded-md flex flex-col justify-between">
-            <div>
-              <h3 className="font-serif text-xl text-[#0F2334] mb-2">
-                Pesan langsung, lebih tenang.
-              </h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Dapatkan jaminan harga terbaik dan fleksibilitas ubah jadwal
-                tanpa biaya tambahan.
-              </p>
-            </div>
-            <div className="mt-6">
-              <p className="text-[11px] text-stone-500 mb-2">
-                Berlaku untuk semua tipe kamar.
-              </p>
-              <Link
-                href="/kamar"
-                className="text-xs font-semibold text-[#0F2334] hover:underline"
-              >
-                Cek ketersediaan →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. TESTIMONIALS ("Datang sebagai tamu. Pulang dengan cerita.") */}
-      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-stone-200">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-12 gap-4">
-          <div>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-semibold">
-              Ulasan Tamu
+      {/* 7. TESTIMONI TAMU (4,8 / 5) */}
+      <section className="max-w-7xl mx-auto px-6 py-20 space-y-10">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7840] font-bold">
+              ULASAN TAMU
             </span>
-            <h2 className="font-serif text-3xl text-[#0F2334] mt-1">
+            <h2 className="font-serif text-3xl text-[#0F2334]">
               Datang sebagai tamu. Pulang dengan cerita.
             </h2>
           </div>
+
           <div className="sm:text-right">
-            <div className="font-serif text-3xl text-[#0F2334]">4,8 / 5</div>
-            <div className="text-amber-500 text-xs">★★★★★</div>
-            <div className="text-[11px] text-stone-400">
-              Berdasarkan 320+ ulasan terverifikasi
-            </div>
+            <p className="font-serif text-3xl text-[#0F2334]">
+              4,8 <span className="text-base text-stone-400">/ 5</span>
+            </p>
+            <p className="text-[11px] text-[#C6A267]">★★★★★</p>
+            <p className="text-[10px] text-stone-500">
+              Berdasarkan 320+ ulasan tamu
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              quote:
-                "“Kamar bersih dan tenang, cocok untuk istirahat setelah seharian keliling kota. Stafnya sangat membantu.”",
-              author: "Dewi Anggraini",
-              origin: "Jakarta • Menginap 2 malam",
-            },
-            {
-              quote:
-                "“Lokasinya strategis tapi suasananya tetap damai. Sarapannya sederhana namun rasanya pas di lidah.”",
-              author: "Bima Pratama",
-              origin: "Bandung • Menginap 3 malam",
-            },
-            {
-              quote:
-                "“Proses check-in cepat tanpa ribet. Desain interiornya hangat, bikin betah berlama-lama di kamar.”",
-              author: "Nadia Putri",
-              origin: "Surabaya • Menginap 1 malam",
-            },
-          ].map((rev, i) => (
-            <div key={i} className="space-y-3">
-              <div className="text-amber-500 text-xs">★★★★★</div>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                {rev.quote}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-2">
+          <div className="space-y-3">
+            <p className="text-xs text-[#C6A267]">★★★★★</p>
+            <p className="text-xs text-stone-700 leading-relaxed">
+              &ldquo;Tempat terbaik untuk singgah di Jogja. Kamar bersih,
+              suasana tenang, dan stafnya sangat ramah menyambut sejak pertama
+              tiba.&rdquo;
+            </p>
+            <div>
+              <p className="text-xs font-bold text-[#0F2334]">Rani Anggraini</p>
+              <p className="text-[10px] text-stone-500">
+                Jakarta • Menginap 2 malam
               </p>
-              <div>
-                <p className="text-xs font-bold text-[#0F2334]">{rev.author}</p>
-                <p className="text-[11px] text-stone-400">{rev.origin}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs text-[#C6A267]">★★★★★</p>
+            <p className="text-xs text-stone-700 leading-relaxed">
+              &ldquo;Lokasinya strategis dekat Stasiun Tugu, tapi di dalam hotel
+              sangat teduh dan nyaman untuk istirahat bersama keluarga.&rdquo;
+            </p>
+            <div>
+              <p className="text-xs font-bold text-[#0F2334]">Bima Santoso</p>
+              <p className="text-[10px] text-stone-500">
+                Bandung • Kamar Keluarga
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs text-[#C6A267]">★★★★★</p>
+            <p className="text-xs text-stone-700 leading-relaxed">
+              &ldquo;Proses check-in cepat tanpa ribet. Sarapannya enak dan
+              area kolam renangnya bikin betah berlama-lama di hotel.&rdquo;
+            </p>
+            <div>
+              <p className="text-xs font-bold text-[#0F2334]">Nadia Putri</p>
+              <p className="text-[10px] text-stone-500">
+                Surabaya • Kamar Deluks
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 8. LOKASI (DI TENGAH KOTA. DEKAT DENGAN CERITANYA.) */}
+      <section className="bg-[#F6F1E9] py-20 px-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="lg:col-span-6 space-y-4">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7840] font-bold">
+              LOKASI STRATEGIS
+            </span>
+            <h2 className="font-serif text-3xl text-[#0F2334] leading-snug">
+              Di tengah kota. Dekat dengan ceritanya.
+            </h2>
+            <p className="text-xs md:text-sm text-stone-600 leading-relaxed">
+              Terletak di kawasan Mangkubumi, dekat Stasiun Tugu dan Malioboro,
+              namun tetap menjaga ketenangan untuk beristirahat.
+            </p>
+            <p className="text-xs font-semibold text-[#0F2334]">
+              Jl. Mangkubumi No. 28, Gowongan, Jetis, Yogyakarta 55232
+            </p>
+            <p className="text-[11px] text-stone-600">
+              • 5 menit dari Stasiun Tugu • 10 menit jalan kaki ke Malioboro • 15
+              menit ke Keraton Yogyakarta
+            </p>
+            <div className="pt-2">
+              <Link
+                href="/kontak"
+                className="inline-block bg-white border border-stone-300 hover:border-[#0F2334] text-[#0F2334] text-xs font-semibold px-4 py-2 rounded transition"
+              >
+                Lihat Rute &amp; Kontak →
+              </Link>
+            </div>
+          </div>
+
+          {/* Peta Visual Yogyakarta */}
+          <div className="lg:col-span-6">
+            <div className="bg-[#E5E2DC] rounded-md border border-stone-300/80 h-64 relative overflow-hidden p-6 flex items-center justify-center">
+              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 gap-2 p-3 opacity-70">
+                <div className="bg-[#EFECE6] rounded-sm p-2 text-[10px] text-stone-500">
+                  Tugu Yogyakarta
+                </div>
+                <div className="bg-[#EFECE6] rounded-sm" />
+                <div className="bg-[#EFECE6] rounded-sm p-2 text-[10px] text-stone-500 text-right">
+                  Jl. Mangkubumi
+                </div>
+                <div className="bg-[#EFECE6] rounded-sm" />
+                <div className="bg-[#D5E2D0] rounded-sm" />
+                <div className="bg-[#EFECE6] rounded-sm" />
+                <div className="bg-[#EFECE6] rounded-sm p-2 text-[10px] text-stone-500 flex items-end">
+                  Stasiun Tugu
+                </div>
+                <div className="bg-[#EFECE6] rounded-sm" />
+                <div className="bg-[#EFECE6] rounded-sm p-2 text-[10px] text-stone-500 flex items-end justify-end">
+                  Kawasan Malioboro
+                </div>
               </div>
+
+              <div className="relative z-10 bg-[#0F2334] text-white px-4 py-2 rounded shadow-md text-xs font-semibold flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#C6A267]" />
+                <span>Nestra Hotel</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. YANG INGIN ANDA KETAHUI (FAQ) */}
+      <section className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-4 space-y-3">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7840] font-bold">
+            PERTANYAAN UMUM
+          </span>
+          <h2 className="font-serif text-3xl text-[#0F2334]">
+            Yang ingin Anda ketahui.
+          </h2>
+          <p className="text-xs text-stone-600">
+            Masih punya pertanyaan lain? Tim resepsionis kami siap membantu.
+          </p>
+          <Link
+            href="/kontak"
+            className="inline-block text-xs font-bold text-[#0F2334] hover:underline pt-1"
+          >
+            Hubungi Kami →
+          </Link>
+        </div>
+
+        <div className="lg:col-span-8 divide-y divide-stone-200 border-y border-stone-200">
+          {FAQS.map((item, idx) => (
+            <div key={item.q} className="py-4">
+              <button
+                type="button"
+                onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                className="w-full flex items-center justify-between text-left text-xs font-bold text-[#0F2334] cursor-pointer"
+              >
+                <span>{item.q}</span>
+                <span className="text-stone-400">
+                  {openFaq === idx ? "⌃" : "⌄"}
+                </span>
+              </button>
+              {openFaq === idx && (
+                <p className="text-xs text-stone-600 mt-2 leading-relaxed">
+                  {item.a}
+                </p>
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      {/* 8. LOCATION ("Di tengah kota. Dekat dengan ceritanya.") */}
-      <section className="bg-[#F6F2EA] py-20">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-4">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-semibold">
-              Lokasi Strategis
-            </span>
-            <h2 className="font-serif text-3xl text-[#0F2334] leading-snug">
-              Di tengah kota. Dekat dengan ceritanya.
-            </h2>
-            <p className="text-xs text-stone-600 leading-relaxed">
-              Akses mudah ke stasiun, pusat kuliner lokal, dan sudut-sudut
-              bersejarah yang bisa dijangkau dengan berjalan kaki.
-            </p>
-            <p className="text-xs font-medium text-[#0F2334]">
-              Jl. Mangkubumi No. 42, Gowongan, Jetis, Yogyakarta 55232
-            </p>
-            <p className="text-[11px] text-stone-500">
-              • 5 menit dari Stasiun Tugu • 10 menit menuju Malioboro
-            </p>
-            <div className="pt-2">
-              <a
-                href="https://maps.google.com"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block bg-white border border-stone-300 px-4 py-2 rounded text-xs font-medium text-[#0F2334] hover:bg-stone-50 transition"
-              >
-                Lihat di Google Maps →
-              </a>
-            </div>
-          </div>
-
-          {/* Placeholder Peta Minimalis */}
-          <div className="h-64 bg-[#E6E2D8] rounded-md relative overflow-hidden border border-stone-300/60 flex items-center justify-center">
-            <div className="bg-[#0F2334] text-white text-xs px-3.5 py-2 rounded shadow-md font-medium">
-              📍 Nestra Hotel
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 9. FAQ ACCORDION ("Yang ingin Anda ketahui.") */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
-          <div className="md:col-span-4 space-y-3">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-semibold">
-              Informasi Umum
-            </span>
-            <h2 className="font-serif text-3xl text-[#0F2334]">
-              Yang ingin Anda ketahui.
-            </h2>
-            <p className="text-xs text-stone-500 leading-relaxed">
-              Masih ada pertanyaan lain? Tim resepsionis kami siap membantu Anda
-              kapan saja.
-            </p>
-            <Link
-              href="/kontak"
-              className="inline-block text-xs font-semibold text-[#0F2334] hover:underline pt-1"
-            >
-              Hubungi kami →
-            </Link>
-          </div>
-
-          <div className="md:col-span-8 divide-y divide-stone-200 border-t border-b border-stone-200">
-            {FAQ_DATA.map((item, index) => (
-              <div key={index} className="py-4">
-                <button
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  className="w-full flex items-center justify-between text-left text-xs md:text-sm font-semibold text-[#0F2334] cursor-pointer"
-                >
-                  <span>{item.q}</span>
-                  <span className="text-lg font-normal text-stone-400">
-                    {openFaq === index ? "−" : "+"}
-                  </span>
-                </button>
-                {openFaq === index && (
-                  <p className="mt-2.5 text-xs text-stone-600 leading-relaxed">
-                    {item.a}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 10. BOTTOM CTA BANNER */}
-      <section className="bg-[#EFE9DD] py-12">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div>
+      {/* 10. CTA BANNER BAWAH */}
+      <section className="bg-[#EAE2D3] py-12 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
             <h2 className="font-serif text-2xl text-[#0F2334]">
               Perjalanan berikutnya dimulai di sini.
             </h2>
-            <p className="text-xs text-stone-600 mt-1">
-              Pilih tanggal Anda, kami siapkan ruang istirahatnya.
+            <p className="text-xs text-stone-700">
+              Pilih kamar yang sesuai untuk tanggal kunjungan Anda.
             </p>
           </div>
           <Link
             href="/kamar"
-            className="bg-[#0F2334] hover:bg-[#19354d] text-white px-6 py-3 rounded text-xs font-medium transition"
+            className="bg-[#0F2334] hover:bg-[#19354d] text-white text-xs font-semibold px-5 py-3 rounded transition self-start sm:self-auto"
           >
-            Pilih Kamar Sekarang →
+            Temukan Kamar Anda →
           </Link>
         </div>
       </section>
 
-      {/* 11. FOOTER */}
-      <footer className="bg-[#0F2334] text-stone-300 pt-16 pb-10 text-xs">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-white/10">
-          <div className="space-y-3">
-            <div className="font-bold tracking-wider text-white text-sm">
-              NESTRA HOTEL
+      {/* 11. FOOTER GELAP #0F2334 SESUAI FIGMA */}
+      <footer className="bg-[#0F2334] text-white pt-16 pb-10 px-6">
+        <div className="max-w-7xl mx-auto space-y-12">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 text-xs">
+            <div className="md:col-span-4 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 border border-[#C6A267] text-[#C6A267] flex items-center justify-center font-serif font-bold text-lg">
+                  N
+                </div>
+                <div className="leading-none">
+                  <span className="block font-bold tracking-[0.16em] text-xs text-white">
+                    NESTRA
+                  </span>
+                  <span className="text-[9px] tracking-[0.22em] text-stone-400">
+                    HOTEL
+                  </span>
+                </div>
+              </div>
+              <p className="font-serif italic text-sm text-[#E5C687]">
+                Your Stay, Made Simple.
+              </p>
+              <p className="text-[11px] text-stone-300 leading-relaxed max-w-xs">
+                Pengalaman menginap butik yang hangat, tenang, dan berkarakter di
+                pusat Kota Yogyakarta.
+              </p>
             </div>
-            <p className="text-[11px] text-amber-200/80">
-              Your Stay, Made Simple.
-            </p>
-            <p className="text-[11px] text-stone-400 leading-relaxed">
-              Hotel butik modern dengan ketenangan maksimal di pusat kota
-              Yogyakarta.
-            </p>
+
+            <div className="md:col-span-4 space-y-2">
+              <p className="text-[11px] font-bold text-stone-300 uppercase tracking-wider">
+                Kontak Kami
+              </p>
+              <p className="text-[11px] text-stone-300">
+                Jl. Mangkubumi No. 28, Gowongan, Jetis, Yogyakarta 55232
+              </p>
+              <p className="text-[11px] text-stone-300">+62 274 555 0198</p>
+              <p className="text-[11px] text-stone-300">halo@nestrahotel.id</p>
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <p className="text-[11px] font-bold text-stone-300 uppercase tracking-wider">
+                Jelajahi Hotel
+              </p>
+              <ul className="space-y-1.5 text-[11px] text-stone-300">
+                <li>
+                  <Link href="/kamar" className="hover:text-white">
+                    Kamar &amp; Suite
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/fasilitas" className="hover:text-white">
+                    Fasilitas &amp; Pengalaman
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/penawaran" className="hover:text-white">
+                    Penawaran Spesial
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/kontak" className="hover:text-white">
+                    Hubungi Kami
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <p className="text-[11px] font-bold text-stone-300 uppercase tracking-wider">
+                Bantuan Tamu
+              </p>
+              <ul className="space-y-1.5 text-[11px] text-stone-300">
+                <li>
+                  <Link href="/reservasi-saya" className="hover:text-white">
+                    Reservasi Saya
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/kontak" className="hover:text-white">
+                    Pertanyaan Umum
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/kontak" className="hover:text-white">
+                    Kebijakan Pembatalan
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/admin/login" className="hover:text-white">
+                    Portal Pengelola
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="text-white font-semibold mb-3">Kontak & Lokasi</div>
-            <p className="text-stone-400">
-              Jl. Mangkubumi No. 42, Yogyakarta 55232
-            </p>
-            <p className="text-stone-400">+62 274 555 0192</p>
-            <p className="text-stone-400">halo@nestrahotel.id</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-white font-semibold mb-3">Jelajahi</div>
-            <ul className="space-y-1.5 text-stone-400">
-              <li><Link href="/kamar" className="hover:text-white">Daftar Kamar</Link></li>
-              <li><Link href="/fasilitas" className="hover:text-white">Fasilitas & Layanan</Link></li>
-              <li><Link href="/penawaran" className="hover:text-white">Penawaran Spesial</Link></li>
-              <li><Link href="/tentang" className="hover:text-white">Tentang Kami</Link></li>
-            </ul>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-white font-semibold mb-3">Bantuan Tamu</div>
-            <ul className="space-y-1.5 text-stone-400">
-              <li><Link href="/reservasi-saya" className="hover:text-white">Cek Reservasi</Link></li>
-              <li><Link href="/kebijakan" className="hover:text-white">Kebijakan Pembatalan</Link></li>
-              <li><Link href="/privasi" className="hover:text-white">Kebijakan Privasi</Link></li>
-              <li><Link href="/syarat" className="hover:text-white">Syarat & Ketentuan</Link></li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="max-w-6xl mx-auto px-6 pt-6 flex flex-col sm:flex-row justify-between items-center text-[11px] text-stone-400 gap-4">
-          <p>© 2026 Nestra Hotel. Seluruh hak cipta dilindungi.</p>
-          <div className="flex gap-4">
-            <span>Instagram</span>
-            <span>WhatsApp</span>
+          <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-stone-400">
+            <span>© 2026 Nestra Hotel. Seluruh hak cipta dilindungi.</span>
+            <span>Yogyakarta • Indonesia</span>
           </div>
         </div>
       </footer>

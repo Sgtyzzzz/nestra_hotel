@@ -134,3 +134,25 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+
+  const adminEmails = [
+    {
+      email: "bbareng27@gmail.com", 
+      name: "Putra Sigit Nurteja",
+      role: "SUPER_ADMIN",
+    },
+    {
+      email: "nestrahotel@gmail.com",  
+      name: "Tim Admin Nestra",
+      role: "ADMIN",
+    },
+  ];
+
+  for (const admin of adminEmails) {
+    await prisma.admin.upsert({
+      where: { email: admin.email },
+      update: { name: admin.name, role: admin.role },
+      create: admin,
+    });
+  }
