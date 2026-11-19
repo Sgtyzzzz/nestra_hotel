@@ -1,640 +1,517 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 
-interface BookingRow {
-  id: string;
-  bookingCode: string;
-  guestFirstName: string;
-  guestLastName: string;
-  arrivalTime: string | null;
-  checkIn: string;
-  checkOut: string;
-  nights: number;
-  totalAmount: number;
-  status: "UPCOMING" | "COMPLETED" | "CANCELLED";
-  paymentStatus: "PAID" | "PENDING" | "REFUNDED";
-  room: {
-    name: string;
-  };
+interface SummaryData {
+  date: string;
+  totalRooms: number;
+  occupiedCount: number;
+  occupancyRate: number;
+  occupancyDiff: number;
+  todayRevenue: number;
+  arrivals: {
+    bookingCode: string;
+    guestName: string;
+    roomName: string;
+    roomNumber: string;
+    arrivalTime: string;
+    paymentStatus: string;
+    status: string;
+  }[];
+  departures: {
+    bookingCode: string;
+    guestName: string;
+    roomName: string;
+    roomNumber: string;
+    status: string;
+  }[];
+  last7Days: {
+    date: string;
+    label: string;
+    occupiedCount: number;
+    occupancyPct: number;
+    revenue: number;
+  }[];
+  avg7DaysOccupancy: number;
 }
 
-interface OverviewResponse {
-  admin: {
-    name: string;
-    email: string;
-    roleLabel: string;
-  };
-  stats: {
-    totalRooms: number;
-    upcomingCount: number;
-    completedCount: number;
-    revenueBeforeTax: number;
-    unreadContacts: number;
-  };
-  bookings: BookingRow[];
+interface EscalatedIncident {
+  id: string;
+  ticketCode: string;
+  title: string;
+  roomNumber: string | null;
+  guestName: string | null;
+  description: string;
+  priority: string;
+  status: string;
+  reportedBy: string;
 }
 
 export default function AdminDashboardPage() {
-  const [data, setData] = useState<OverviewResponse | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ARRIVAL" | "DEPARTURE">("ARRIVAL");
-  const [processingCode, setProcessingCode] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"ARRIVALS" | "DEPARTURES">(
+    "ARRIVALS"
+  );
 
-  // State tanggal & sapaan agar tidak dipanggil langsung saat render (kompatibel Next.js 16)
-  const [greeting, setGreeting] = useState("Selamat datang");
-  const [todayFormatted, setTodayFormatted] = useState("");
+  // State sinkronisasi dari portal karyawan (/staff/kendala & /staff/kamar)
+  const [escalatedIncidents, setEscalatedIncidents] = useState<
+    EscalatedIncident[]
+  >([]);
+  const [roomCounts, setRoomCounts] = useState({ dirty: 0, maintenance: 0 });
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
-  const loadOverview = async () => {
+  const loadStaffSyncData = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/overview");
+      const res = await fetch("/api/staff/operations", { cache: "no-store" });
       if (res.ok) {
-        const json = await res.json();
-        setData(json);
+        const staffData = await res.json();
+        const incidents: EscalatedIncident[] = staffData.incidents || [];
+        const units: { status: string }[] = staffData.roomUnits || [];
+
+        setEscalatedIncidents(
+          incidents.filter((i) => i.status === "ESCALATED")
+        );
+        setRoomCounts({
+          dirty: units.filter((u) => u.status === "DIRTY").length,
+          maintenance: units.filter((u) => u.status === "MAINTENANCE").length,
+        });
       }
-    } finally {
-      setLoading(false);
+    } catch {
+      // Abaikan jika gagal memuat data tambahan
     }
-  };
-
-  useEffect(() => {
-    loadOverview();
-
-    const now = new Date();
-    const hour = now.getHours();
-    if (hour < 11) setGreeting("Selamat pagi");
-    else if (hour < 15) setGreeting("Selamat siang");
-    else if (hour < 18) setGreeting("Selamat sore");
-    else setGreeting("Selamat malam");
-
-    setTodayFormatted(
-      now.toLocaleDateString("id-ID", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    );
   }, []);
 
-  const handleCheckInProcess = async (bookingCode: string) => {
-    setProcessingCode(bookingCode);
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/admin/summary?date=${selectedDate}`)
+      .then((res) => res.json())
+      .then((json) => setData(json))
+      .finally(() => setLoading(false));
+
+    loadStaffSyncData();
+  }, [selectedDate, loadStaffSyncData]);
+
+  const handleResolveIncident = async (incidentId: string) => {
+    setResolvingId(incidentId);
     try {
-      const res = await fetch(`/api/admin/bookings/${bookingCode}`, {
-        method: "PATCH",
+      const res = await fetch("/api/staff/operations", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "COMPLETED", paymentStatus: "PAID" }),
+        body: JSON.stringify({
+          action: "RESOLVE_INCIDENT",
+          incidentId,
+        }),
       });
       if (res.ok) {
-        await loadOverview();
+        setEscalatedIncidents((prev) =>
+          prev.filter((item) => item.id !== incidentId)
+        );
       }
     } finally {
-      setProcessingCode(null);
+      setResolvingId(null);
     }
   };
 
-  const fullName = data?.admin.name || "Admin Nestra";
-  const firstName = fullName.split(" ")[0];
-  const initials = fullName
-    .split(" ")
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
-
-  const formatRupiahCompact = (amount: number) => {
-    if (amount >= 1_000_000) {
-      const juta = (amount / 1_000_000).toFixed(1).replace(".", ",");
-      return `Rp${juta} jt`;
-    }
-    return "Rp" + amount.toLocaleString("id-ID");
-  };
-
-  const arrivals =
-    data?.bookings.filter((b) => b.status === "UPCOMING") || [];
-  const departures =
-    data?.bookings.filter((b) => b.status === "COMPLETED") || [];
-  const displayedRows = activeTab === "ARRIVAL" ? arrivals : departures;
-
-  const occupancyPercent = data
-    ? Math.min(100, Math.round((arrivals.length / 10) * 100))
-    : 0;
+  const maxRev = Math.max(
+    1000000,
+    ...(data?.last7Days.map((d) => d.revenue) || [0])
+  );
 
   return (
-    <div className="min-h-screen flex bg-[#F8F6F2] text-[#1A202C]">
-      {/* SIDEBAR KIRI */}
-      <aside className="w-64 bg-[#0F2334] text-white flex flex-col justify-between shrink-0 hidden lg:flex">
-        <div className="p-6 space-y-7">
-          {/* Logo */}
-          <Link href="/admin" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 border border-[#C6A267]/60 text-[#C6A267] flex items-center justify-center font-serif font-bold text-lg rounded-sm">
-              N
-            </div>
-            <div className="leading-none">
-              <span className="block font-bold tracking-wider text-sm text-white">
-                NESTRA
-              </span>
-              <span className="text-[10px] tracking-[0.2em] text-stone-400">
-                HOTEL
-              </span>
-            </div>
-          </Link>
-
-          {/* Property Selector */}
-          <div className="space-y-1">
-            <span className="block text-[9px] uppercase tracking-[0.18em] text-stone-400 font-semibold">
-              PENGELOLA HOTEL
-            </span>
-            <div className="flex items-center justify-between text-xs font-medium text-white py-1">
-              <span>Nestra Yogyakarta</span>
-              <span className="text-stone-400 text-[10px]">⌄</span>
-            </div>
-          </div>
-
-          {/* Navigation Menu */}
-          <nav className="space-y-1 text-xs">
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded bg-white/10 text-white font-semibold"
-            >
-              <span>⊞</span>
-              <span>Beranda</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded text-stone-300 hover:bg-white/5 hover:text-white transition"
-            >
-              <span>◫</span>
-              <span>Ringkasan</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded text-stone-300 hover:bg-white/5 hover:text-white transition"
-            >
-              <span>📅</span>
-              <span>Reservasi</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded text-stone-300 hover:bg-white/5 hover:text-white transition"
-            >
-              <span>🛏</span>
-              <span>Kamar & kebersihan</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded text-stone-300 hover:bg-white/5 hover:text-white transition"
-            >
-              <span>📈</span>
-              <span>Pendapatan & laporan</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded text-stone-300 hover:bg-white/5 hover:text-white transition"
-            >
-              <span>👥</span>
-              <span>Tamu</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded text-stone-300 hover:bg-white/5 hover:text-white transition"
-            >
-              <span>⚙</span>
-              <span>Pengaturan</span>
-            </Link>
-          </nav>
+    <div className="space-y-6">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-3xl text-[#0F2334]">
+            Ringkasan hotel
+          </h1>
+          <p className="text-xs text-stone-500 mt-1">
+            Selamat pagi, Rani. Berikut keadaan hotel dan agenda hari ini.
+          </p>
         </div>
 
-        {/* Bottom Admin Profile (Dinamis sesuai akun Gmail yang login) */}
-        <div className="p-6 border-t border-white/10 space-y-5">
-          <div className="flex items-center gap-4 text-[11px] text-stone-400">
-            <Link href="/" target="_blank" className="hover:text-white">
-              Lihat situs hotel ↗
-            </Link>
-            <Link href="/kontak" className="hover:text-white">
-              Pusat bantuan
-            </Link>
-          </div>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="bg-white border border-stone-200 rounded px-3.5 py-2 text-xs font-medium text-[#0F2334]"
+        />
+      </div>
 
-          <div className="space-y-0.5">
-            <p className="text-xs font-semibold text-white">{fullName}</p>
-            <p className="text-[11px] text-stone-400 flex items-center gap-1.5">
-              <span>{data?.admin.roleLabel || "Manajer Hotel"}</span>
-              <span>•</span>
-              <button
-                type="button"
-                onClick={() => signOut({ callbackUrl: "/admin/login" })}
-                className="text-stone-300 hover:text-white underline cursor-pointer"
-              >
-                Keluar
-              </button>
-            </p>
-          </div>
-        </div>
-      </aside>
-
-      {/* MAIN AREA */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* TOP HEADER BAR */}
-        <header className="h-14 bg-white border-b border-stone-200 px-6 md:px-8 flex items-center justify-between text-xs">
-          <div className="text-stone-500">
-            <span>Nestra Yogyakarta</span>
-            <span className="mx-2">/</span>
-            <span className="font-semibold text-[#0F2334]">Beranda</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-stone-400 text-[11px]">
-              {todayFormatted}
+      {/* 4 KARTU KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white border border-stone-200/90 rounded-md p-5 space-y-1.5">
+          <p className="text-[11px] text-stone-500">Okupansi malam ini</p>
+          <p className="font-serif text-3xl font-bold text-[#0F2334]">
+            {loading ? "..." : `${data?.occupancyRate ?? 0}%`}
+          </p>
+          <p className="text-[10px] text-stone-400">
+            {data?.occupiedCount ?? 0} dari {data?.totalRooms ?? 60} kamar •{" "}
+            <span className="text-emerald-700 font-semibold">
+              {(data?.occupancyDiff ?? 0) >= 0
+                ? `+${data?.occupancyDiff ?? 0}`
+                : data?.occupancyDiff}{" "}
+              poin dari kemarin
             </span>
-            <button
-              type="button"
-              className="relative text-stone-600 hover:text-[#0F2334]"
-              title="Notifikasi operasional"
-            >
-              🔔
-              {(data?.stats.unreadContacts || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
-              )}
-            </button>
-            <div
-              title={`${fullName} (${data?.admin.email || ""})`}
-              className="w-7 h-7 rounded bg-[#F0ECE3] border border-stone-300 text-[#0F2334] font-bold text-[11px] flex items-center justify-center"
-            >
-              {initials || "AD"}
-            </div>
-          </div>
-        </header>
+          </p>
+        </div>
 
-        {/* DASHBOARD BODY */}
-        <main className="p-6 md:p-8 max-w-6xl w-full mx-auto space-y-8 flex-1">
-          {/* HERO GREETING CARD */}
-          <section className="bg-[#0F2334] text-white rounded-md p-6 md:p-8 flex flex-col justify-between gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-[#C6A267] font-semibold">
-                BERANDA ADMIN
-              </span>
-              <span className="text-[11px] text-stone-300">
-                {todayFormatted}
-              </span>
-            </div>
+        <div className="bg-white border border-stone-200/90 rounded-md p-5 space-y-1.5">
+          <p className="text-[11px] text-stone-500">Pendapatan kamar hari ini</p>
+          <p className="font-serif text-3xl font-bold text-[#0F2334]">
+            {loading
+              ? "..."
+              : `Rp${(data?.todayRevenue ?? 0).toLocaleString("id-ID")}`}
+          </p>
+          <p className="text-[10px] text-stone-400">
+            Berdasarkan kamar terpesan • sebelum pajak
+          </p>
+        </div>
 
-            <div className="space-y-2">
-              <h1 className="font-serif text-2xl md:text-3xl text-white">
-                {greeting}, {firstName}.
-              </h1>
-              <p className="text-xs text-stone-300">
-                Selamat datang kembali. Kelola operasional Nestra Yogyakarta dari
-                satu tempat.
+        <div className="bg-white border border-stone-200/90 rounded-md p-5 space-y-1.5">
+          <p className="text-[11px] text-stone-500">Kedatangan hari ini</p>
+          <p className="font-serif text-3xl font-bold text-[#0F2334]">
+            {loading ? "..." : data?.arrivals.length ?? 0}
+          </p>
+          <p className="text-[10px] text-stone-400">
+            {data?.arrivals.filter((a) => a.status === "COMPLETED").length ?? 0}{" "}
+            sudah masuk •{" "}
+            {data?.arrivals.filter((a) => a.status !== "COMPLETED").length ?? 0}{" "}
+            dijadwalkan
+          </p>
+        </div>
+
+        <div className="bg-white border border-stone-200/90 rounded-md p-5 space-y-1.5">
+          <p className="text-[11px] text-stone-500">Keberangkatan hari ini</p>
+          <p className="font-serif text-3xl font-bold text-[#0F2334]">
+            {loading ? "..." : data?.departures.length ?? 0}
+          </p>
+          <p className="text-[10px] text-stone-400">
+            {data?.departures.filter((d) => d.status === "COMPLETED").length ??
+              0}{" "}
+            sudah keluar •{" "}
+            {data?.departures.filter((d) => d.status !== "COMPLETED").length ??
+              0}{" "}
+            dijadwalkan
+          </p>
+        </div>
+      </div>
+
+      {/* BANNER STATUS KAMAR (SINKRON DENGAN ROOMUNIT) */}
+      <div className="bg-[#FAF4E8] border border-[#E8D8B9] rounded-md px-4 py-3 text-xs text-[#6E5323] flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5">
+          <span>ⓘ</span>
+          <span>
+            {roomCounts.dirty} kamar perlu dibersihkan dan{" "}
+            {roomCounts.maintenance} kamar dalam perawatan. Pastikan kesiapan
+            untuk {data?.arrivals.length ?? 0} kedatangan hari ini.
+          </span>
+        </div>
+        <Link
+          href="/admin/kamar"
+          className="font-semibold underline shrink-0 hover:text-[#0F2334]"
+        >
+          Cek kamar →
+        </Link>
+      </div>
+
+      {/* 2 GRAFIK 7 HARI TERAKHIR */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border border-stone-200/90 rounded-md p-6 space-y-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="font-serif text-lg text-[#0F2334]">
+                Okupansi • 7 hari terakhir
+              </h2>
+              <p className="text-[11px] text-stone-400">
+                Kamar terpesan / 60 kamar
               </p>
             </div>
+            <span className="bg-[#EEF2F6] text-[#0F2334] text-[10px] font-semibold px-2.5 py-1 rounded">
+              Rata-rata {data?.avg7DaysOccupancy ?? 0}%
+            </span>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <Link
-                href="/kamar"
-                className="bg-white text-[#0F2334] hover:bg-stone-100 px-4 py-2 rounded text-xs font-semibold transition"
+          <div className="h-40 flex items-end gap-3 pt-4 border-b border-stone-100">
+            {(data?.last7Days || []).map((day) => (
+              <div
+                key={day.date}
+                className="flex-1 flex flex-col items-center gap-1.5"
               >
-                + Tambah reservasi
-              </Link>
-              <Link
-                href="/reservasi-saya"
-                className="border border-white/25 hover:border-white/50 text-white px-4 py-2 rounded text-xs font-medium transition"
-              >
-                Lihat ringkasan hotel →
-              </Link>
-            </div>
-          </section>
+                <span className="text-[10px] font-semibold text-[#0F2334]">
+                  {day.occupancyPct}%
+                </span>
+                <div className="w-full bg-[#FAF7F2] rounded-t h-28 flex items-end">
+                  <div
+                    style={{
+                      height: `${Math.max(6, day.occupancyPct)}%`,
+                    }}
+                    className="w-full bg-[#0F2334] rounded-t transition-all"
+                  />
+                </div>
+                <span className="text-[10px] text-stone-400">{day.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          {/* KONDISI HOTEL HARI INI (4 METRIC CARDS) */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
+        <div className="bg-white border border-stone-200/90 rounded-md p-6 space-y-4">
+          <div className="flex items-start justify-between">
+            <div>
               <h2 className="font-serif text-lg text-[#0F2334]">
-                Kondisi hotel hari ini
+                Pendapatan kamar • 7 hari terakhir
               </h2>
-              <span className="text-[11px] text-stone-400">
-                Data langsung dari PostgreSQL
-              </span>
+              <p className="text-[11px] text-stone-400">
+                Dalam Rupiah • sebelum pajak
+              </p>
             </div>
+            <span className="text-xs font-bold text-[#0F2334]">
+              Rp{(data?.todayRevenue ?? 0).toLocaleString("id-ID")} hari ini
+            </span>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 space-y-2">
-                <span className="block text-[11px] text-stone-500">
-                  Okupansi aktif
-                </span>
-                <p className="text-2xl font-bold text-[#0F2334]">
-                  {loading ? "..." : `${occupancyPercent}%`}
-                </p>
-                <p className="text-[11px] text-emerald-700">
-                  {arrivals.length} reservasi aktif •{" "}
-                  {data?.stats.totalRooms || 3} tipe kamar
-                </p>
-              </div>
-
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 space-y-2">
-                <span className="block text-[11px] text-stone-500">
-                  Pendapatan kamar tercatat
-                </span>
-                <p className="text-2xl font-bold text-[#0F2334]">
-                  {loading
-                    ? "..."
-                    : formatRupiahCompact(data?.stats.revenueBeforeTax || 0)}
-                </p>
-                <p className="text-[11px] text-stone-400">
-                  Berdasarkan kamar terpesan • sebelum pajak
-                </p>
-              </div>
-
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 space-y-2">
-                <span className="block text-[11px] text-stone-500">
-                  Kedatangan dijadwalkan
-                </span>
-                <p className="text-2xl font-bold text-[#0F2334]">
-                  {loading ? "..." : arrivals.length}
-                </p>
-                <p className="text-[11px] text-stone-400">
-                  {departures.length} sudah selesai • {arrivals.length} menunggu
-                  check-in
-                </p>
-              </div>
-
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 space-y-2">
-                <span className="block text-[11px] text-stone-500">
-                  Riwayat menginap selesai
-                </span>
-                <p className="text-2xl font-bold text-[#0F2334]">
-                  {loading ? "..." : departures.length}
-                </p>
-                <p className="text-[11px] text-stone-400">
-                  Tamu telah check-out
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* AKSES CEPAT (3 CARDS) */}
-          <section className="space-y-3">
-            <h2 className="font-serif text-lg text-[#0F2334]">Akses cepat</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 flex flex-col justify-between space-y-4">
-                <div className="space-y-1.5">
-                  <span className="text-base">📅</span>
-                  <h3 className="text-sm font-bold text-[#0F2334]">
-                    Reservasi
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    Kelola pemesanan dan proses masuk tamu.
-                  </p>
-                </div>
-                <a
-                  href="#tabel-kedatangan"
-                  className="text-xs font-semibold text-[#0F2334] hover:underline"
+          <div className="h-40 flex items-end gap-3 pt-4 border-b border-stone-100">
+            {(data?.last7Days || []).map((day) => {
+              const barPct = Math.round((day.revenue / maxRev) * 100);
+              return (
+                <div
+                  key={day.date}
+                  className="flex-1 flex flex-col items-center gap-1.5"
                 >
-                  Kelola reservasi →
-                </a>
-              </div>
-
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 flex flex-col justify-between space-y-4">
-                <div className="space-y-1.5">
-                  <span className="text-base">🛏</span>
-                  <h3 className="text-sm font-bold text-[#0F2334]">
-                    Kamar & kebersihan
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    Pantau kesiapan kamar dan tugas tim.
-                  </p>
+                  <span className="text-[9px] font-semibold text-[#0F2334]">
+                    {day.revenue > 0
+                      ? `${(day.revenue / 1000000).toFixed(1)}jt`
+                      : "0"}
+                  </span>
+                  <div className="w-full bg-[#FAF7F2] rounded-t h-28 flex items-end">
+                    <div
+                      style={{ height: `${Math.max(6, barPct)}%` }}
+                      className="w-full bg-[#C6A267] rounded-t transition-all"
+                    />
+                  </div>
+                  <span className="text-[10px] text-stone-400">
+                    {day.label}
+                  </span>
                 </div>
-                <Link
-                  href="/kamar"
-                  className="text-xs font-semibold text-[#0F2334] hover:underline"
-                >
-                  Kelola kamar →
-                </Link>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
-              <div className="bg-white p-5 rounded-md border border-stone-200/90 flex flex-col justify-between space-y-4">
-                <div className="space-y-1.5">
-                  <span className="text-base">📈</span>
-                  <h3 className="text-sm font-bold text-[#0F2334]">
-                    Pendapatan & laporan
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    Tinjau pendapatan dan kinerja hotel.
-                  </p>
-                </div>
-                <a
-                  href="#tabel-kedatangan"
-                  className="text-xs font-semibold text-[#0F2334] hover:underline"
-                >
-                  Buka laporan →
-                </a>
-              </div>
-            </div>
-          </section>
+      {/* BAWAH: KEDATANGAN & KEBERANGKATAN + PRIORITAS OPERASIONAL (ESKALASI KARYAWAN) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div className="lg:col-span-8 bg-white border border-stone-200/90 rounded-md p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-lg text-[#0F2334]">
+              Kedatangan &amp; keberangkatan
+            </h2>
+            <Link
+              href="/admin/reservasi"
+              className="text-xs font-semibold text-[#0F2334] hover:underline"
+            >
+              Lihat semua →
+            </Link>
+          </div>
 
-          {/* BOTTOM 2 COLUMNS: KEDATANGAN & PRIORITAS OPERASIONAL */}
-          <section
-            id="tabel-kedatangan"
-            className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
-          >
-            {/* LEFT TABLE (7 COLS) */}
-            <div className="lg:col-span-7 bg-white p-6 rounded-md border border-stone-200/90 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-serif text-lg text-[#0F2334]">
-                  Kedatangan & keberangkatan
-                </h2>
-              </div>
+          <div className="flex items-center gap-6 border-b border-stone-200 pb-2.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab("ARRIVALS")}
+              className={`pb-2.5 -mb-[11px] cursor-pointer ${
+                activeTab === "ARRIVALS"
+                  ? "border-b-2 border-[#0F2334] font-bold text-[#0F2334]"
+                  : "text-stone-400"
+              }`}
+            >
+              Kedatangan ({data?.arrivals.length ?? 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("DEPARTURES")}
+              className={`pb-2.5 -mb-[11px] cursor-pointer ${
+                activeTab === "DEPARTURES"
+                  ? "border-b-2 border-[#0F2334] font-bold text-[#0F2334]"
+                  : "text-stone-400"
+              }`}
+            >
+              Keberangkatan ({data?.departures.length ?? 0})
+            </button>
+          </div>
 
-              {/* Tabs */}
-              <div className="flex items-center justify-between border-b border-stone-200 pb-2.5 text-xs">
-                <div className="flex items-center gap-5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("ARRIVAL")}
-                    className={`pb-2.5 -mb-[11px] cursor-pointer ${
-                      activeTab === "ARRIVAL"
-                        ? "border-b-2 border-[#0F2334] font-bold text-[#0F2334]"
-                        : "text-stone-500 hover:text-[#0F2334]"
-                    }`}
-                  >
-                    Kedatangan ({arrivals.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("DEPARTURE")}
-                    className={`pb-2.5 -mb-[11px] cursor-pointer ${
-                      activeTab === "DEPARTURE"
-                        ? "border-b-2 border-[#0F2334] font-bold text-[#0F2334]"
-                        : "text-stone-500 hover:text-[#0F2334]"
-                    }`}
-                  >
-                    Selesai / Keberangkatan ({departures.length})
-                  </button>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-[#F8F6F2] text-stone-500 text-[11px]">
-                      <th className="py-2.5 px-3 font-medium">Tamu</th>
-                      <th className="py-2.5 px-3 font-medium">Tipe Kamar</th>
-                      <th className="py-2.5 px-3 font-medium">Perkiraan</th>
-                      <th className="py-2.5 px-3 font-medium">Pembayaran</th>
-                      <th className="py-2.5 px-3 font-medium text-right">
-                        Tindakan
-                      </th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-[#FAF7F2] text-[10px] text-stone-500 uppercase">
+                  <th className="py-2 px-3">Tamu</th>
+                  <th className="py-2 px-3">Kamar</th>
+                  <th className="py-2 px-3">Perkiraan</th>
+                  <th className="py-2 px-3">Pembayaran</th>
+                  <th className="py-2 px-3 text-right">Tindakan</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {activeTab === "ARRIVALS" ? (
+                  (data?.arrivals || []).length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-8 text-center text-stone-400"
+                      >
+                        Tidak ada jadwal kedatangan pada tanggal ini.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {loading ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="py-6 text-center text-stone-400"
-                        >
-                          Memuat data tamu...
+                  ) : (
+                    data!.arrivals.map((a) => (
+                      <tr key={a.bookingCode}>
+                        <td className="py-3 px-3 font-medium text-[#0F2334]">
+                          {a.guestName}
+                        </td>
+                        <td className="py-3 px-3 text-stone-600">
+                          {a.roomNumber} · {a.roomName}
+                        </td>
+                        <td className="py-3 px-3 text-stone-500">
+                          {a.arrivalTime}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                              a.paymentStatus === "PAID"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {a.paymentStatus === "PAID"
+                              ? "Lunas"
+                              : "Belum lunas"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <Link
+                            href={`/admin/reservasi/${a.bookingCode}`}
+                            className="font-semibold text-[#0F2334] hover:underline"
+                          >
+                            Detail ↗
+                          </Link>
                         </td>
                       </tr>
-                    ) : displayedRows.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="py-6 text-center text-stone-400"
+                    ))
+                  )
+                ) : (data?.departures || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-stone-400">
+                      Tidak ada jadwal keberangkatan pada tanggal ini.
+                    </td>
+                  </tr>
+                ) : (
+                  data!.departures.map((d) => (
+                    <tr key={d.bookingCode}>
+                      <td className="py-3 px-3 font-medium text-[#0F2334]">
+                        {d.guestName}
+                      </td>
+                      <td className="py-3 px-3 text-stone-600">
+                        {d.roomNumber} · {d.roomName}
+                      </td>
+                      <td className="py-3 px-3 text-stone-500">12.00 WIB</td>
+                      <td className="py-3 px-3">
+                        <span className="bg-stone-100 text-stone-600 text-[10px] font-semibold px-2 py-0.5 rounded">
+                          {d.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <Link
+                          href={`/admin/reservasi/${d.bookingCode}`}
+                          className="font-semibold text-[#0F2334] hover:underline"
                         >
-                          Belum ada data pada tab ini.
-                        </td>
-                      </tr>
-                    ) : (
-                      displayedRows.map((item) => (
-                        <tr key={item.id}>
-                          <td className="py-3 px-3">
-                            <p className="font-semibold text-[#0F2334]">
-                              {item.guestFirstName} {item.guestLastName}
-                            </p>
-                            <p className="text-[10px] text-stone-400">
-                              {item.bookingCode}
-                            </p>
-                          </td>
-                          <td className="py-3 px-3 text-stone-600">
-                            {item.room.name}
-                          </td>
-                          <td className="py-3 px-3 text-stone-600">
-                            {item.arrivalTime || "14.00"}
-                          </td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded ${
-                                item.paymentStatus === "PAID"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-amber-50 text-amber-700"
-                              }`}
-                            >
-                              {item.paymentStatus === "PAID"
-                                ? "Lunas"
-                                : "Belum lunas"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            {item.status === "UPCOMING" ? (
-                              <button
-                                type="button"
-                                disabled={processingCode === item.bookingCode}
-                                onClick={() =>
-                                  handleCheckInProcess(item.bookingCode)
-                                }
-                                className="border border-stone-300 hover:border-[#0F2334] text-[#0F2334] px-3 py-1 rounded text-[11px] font-medium transition cursor-pointer"
-                              >
-                                {processingCode === item.bookingCode
-                                  ? "Memproses..."
-                                  : "Proses masuk"}
-                              </button>
-                            ) : (
-                              <Link
-                                href={`/reservasi/konfirmasi?code=${item.bookingCode}`}
-                                className="text-[11px] text-stone-600 hover:text-[#0F2334] font-medium"
-                              >
-                                Lihat detail →
-                              </Link>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                          Detail ↗
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            {/* RIGHT OPERATIONAL PRIORITIES (5 COLS) */}
-            <div className="lg:col-span-5 bg-white p-6 rounded-md border border-stone-200/90 space-y-4">
-              <h2 className="font-serif text-lg text-[#0F2334]">
-                Prioritas operasional
-              </h2>
+        {/* KANAN: PRIORITAS OPERASIONAL & ESKALASI DARI KARYAWAN */}
+        <div className="lg:col-span-4 bg-white border border-stone-200/90 rounded-md p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-lg text-[#0F2334]">
+              Prioritas &amp; eskalasi
+            </h2>
+            {escalatedIncidents.length > 0 && (
+              <span className="bg-red-50 text-red-700 text-[10px] font-semibold px-2.5 py-0.5 rounded">
+                {escalatedIncidents.length} eskalasi
+              </span>
+            )}
+          </div>
 
-              <div className="divide-y divide-stone-100">
-                <div className="pb-3.5 space-y-1">
-                  <span className="inline-block bg-red-50 text-red-700 text-[10px] font-semibold px-2 py-0.5 rounded">
-                    Tinggi
-                  </span>
-                  <p className="text-xs font-bold text-[#0F2334] pt-1">
-                    Periksa pendingin kamar Deluks
+          <div className="divide-y divide-stone-100 text-xs">
+            {escalatedIncidents.length === 0 ? (
+              <p className="py-6 text-center text-stone-400">
+                Tidak ada kendala yang dieskalasi karyawan saat ini.
+              </p>
+            ) : (
+              escalatedIncidents.map((inc) => (
+                <div key={inc.id} className="py-3.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                        inc.priority === "URGENT"
+                          ? "bg-red-50 text-red-700"
+                          : inc.priority === "HIGH"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-stone-100 text-stone-700"
+                      }`}
+                    >
+                      {inc.priority === "URGENT"
+                        ? "Mendesak"
+                        : inc.priority === "HIGH"
+                        ? "Tinggi"
+                        : "Normal"}
+                    </span>
+                    <span className="text-[10px] text-stone-400 font-mono">
+                      #{inc.ticketCode}
+                    </span>
+                  </div>
+
+                  <p className="font-semibold text-[#0F2334]">{inc.title}</p>
+
+                  <p className="text-[11px] text-stone-500">
+                    {inc.guestName ? `${inc.guestName} • ` : ""}
+                    {inc.roomNumber ? `Kamar ${inc.roomNumber}` : "Umum"} •
+                    Dilaporkan {inc.reportedBy}
                   </p>
-                  <p className="text-[11px] text-stone-400">
-                    Teknisi Arif • Tenggat 11.00
-                  </p>
+
+                  {inc.description && (
+                    <p className="text-[11px] text-stone-400 line-clamp-2">
+                      {inc.description}
+                    </p>
+                  )}
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      disabled={resolvingId === inc.id}
+                      onClick={() => handleResolveIncident(inc.id)}
+                      className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                    >
+                      {resolvingId === inc.id
+                        ? "Menyelesaikan..."
+                        : "Tandai selesai ✓"}
+                    </button>
+                  </div>
                 </div>
-
-                <div className="py-3.5 space-y-1">
-                  <span className="inline-block bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded">
-                    Sedang
-                  </span>
-                  <p className="text-xs font-bold text-[#0F2334] pt-1">
-                    Siapkan kamar untuk kedatangan hari ini
-                  </p>
-                  <p className="text-[11px] text-stone-400">
-                    Tim Housekeeping • Tenggat 13.00
-                  </p>
-                </div>
-
-                <div className="pt-3.5 space-y-1">
-                  <span className="inline-block bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded">
-                    Sedang
-                  </span>
-                  <p className="text-xs font-bold text-[#0F2334] pt-1">
-                    Konfirmasi sarapan tamu menginap
-                  </p>
-                  <p className="text-[11px] text-stone-400">
-                    Restoran Serambi • 06.30 WIB
-                  </p>
-                </div>
-              </div>
-
-              {(data?.stats.unreadContacts || 0) === 0 ? (
-                <div className="bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 text-xs px-3.5 py-2.5 rounded flex items-center gap-2">
-                  <span className="font-bold">✓</span>
-                  <span>Tidak ada keluhan tamu yang belum ditangani.</span>
-                </div>
-              ) : (
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3.5 py-2.5 rounded flex items-center gap-2">
-                  <span className="font-bold">!</span>
-                  <span>
-                    Ada {data?.stats.unreadContacts} pesan tamu baru dari form
-                    Hubungi Kami.
-                  </span>
-                </div>
-              )}
-            </div>
-          </section>
-        </main>
-
-        {/* FOOTER */}
-        <footer className="px-6 md:px-8 py-4 border-t border-stone-200 text-[11px] text-stone-400 flex items-center justify-between">
-          <span>Data terhubung ke PostgreSQL • Nestra Hotel</span>
-          <span>Nestra Hotel • Portal pengelola</span>
-        </footer>
+              ))
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

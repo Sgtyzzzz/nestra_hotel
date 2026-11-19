@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function PaymentPage() {
+function PaymentContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const existingCode = searchParams.get("code");
 
   const [guestInfo, setGuestInfo] = useState({
     firstName: "Aditya",
@@ -36,6 +38,32 @@ export default function PaymentPage() {
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
+    // Jika datang dari reservasi Nia (?code=NST-...), muat data booking dari database
+    if (existingCode) {
+      fetch(`/api/bookings/${encodeURIComponent(existingCode)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((booking) => {
+          if (!booking) return;
+          setGuestInfo({
+            firstName: booking.guestFirstName,
+            lastName: booking.guestLastName === "-" ? "" : booking.guestLastName,
+            email: booking.guestEmail,
+            phone: booking.guestPhone,
+            arrivalTime: booking.arrivalTime || "14.00–15.00 WIB",
+            specialRequest: booking.specialRequest || "-",
+            roomSlug: booking.room.slug,
+            roomName: booking.room.name,
+            basePrice: booking.room.basePrice,
+            nights: booking.nights,
+            adults: booking.adults,
+            checkIn: new Date(booking.checkIn).toISOString().slice(0, 10),
+            checkOut: new Date(booking.checkOut).toISOString().slice(0, 10),
+          });
+        })
+        .catch(() => {});
+      return;
+    }
+
     const saved = sessionStorage.getItem("nestra_booking_guest");
     if (saved) {
       try {
@@ -60,7 +88,7 @@ export default function PaymentPage() {
         // Gunakan default
       }
     }
-  }, []);
+  }, [existingCode]);
 
   const roomSubtotal = guestInfo.basePrice * guestInfo.nights;
   const discountAmount = appliedPromo
@@ -111,6 +139,34 @@ export default function PaymentPage() {
     setSubmitError("");
 
     try {
+      // Jika melunasi booking yang sudah dibuat via Nia
+      if (existingCode) {
+        const res = await fetch(
+          `/api/bookings/${encodeURIComponent(existingCode)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "PAY",
+              paymentMethod,
+              promoCode: appliedPromo?.code || null,
+            }),
+          }
+        );
+
+        const data = await res.json();
+        if (!res.ok) {
+          setSubmitError(data.error || "Gagal memproses pembayaran.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        sessionStorage.setItem("nestra_last_booking_code", data.bookingCode);
+        router.push(`/reservasi/konfirmasi?code=${data.bookingCode}`);
+        return;
+      }
+
+      // Alur checkout manual
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +190,9 @@ export default function PaymentPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setSubmitError(data.error || "Terjadi kesalahan saat memproses reservasi.");
+        setSubmitError(
+          data.error || "Terjadi kesalahan saat memproses reservasi."
+        );
         setIsSubmitting(false);
         return;
       }
@@ -166,43 +224,12 @@ export default function PaymentPage() {
             </div>
           </Link>
           <span className="text-xs text-stone-500">
-            Langkah 3 dari 4 • Pembayaran Aman
+            {existingCode
+              ? `Pembayaran Reservasi • ${existingCode}`
+              : "Langkah 3 dari 4 • Pembayaran Aman"}
           </span>
         </div>
       </header>
-
-      {/* STEPPER */}
-      <div className="bg-white border-b border-stone-200 py-4">
-        <div className="max-w-3xl mx-auto px-6 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-stone-600">
-            <span className="w-6 h-6 rounded-full bg-[#0F2334] text-white flex items-center justify-center text-[11px] font-bold">
-              ✓
-            </span>
-            <span className="hidden sm:inline">Pilih kamar</span>
-          </div>
-          <div className="h-[1px] flex-1 bg-[#0F2334] mx-3" />
-          <div className="flex items-center gap-2 text-stone-600">
-            <span className="w-6 h-6 rounded-full bg-[#0F2334] text-white flex items-center justify-center text-[11px] font-bold">
-              ✓
-            </span>
-            <span className="hidden sm:inline">Data tamu</span>
-          </div>
-          <div className="h-[1px] flex-1 bg-[#0F2334] mx-3" />
-          <div className="flex items-center gap-2 font-semibold text-[#0F2334]">
-            <span className="w-6 h-6 rounded-full bg-[#0F2334] text-white flex items-center justify-center text-[11px] font-bold">
-              3
-            </span>
-            <span>Pembayaran</span>
-          </div>
-          <div className="h-[1px] flex-1 bg-stone-200 mx-3" />
-          <div className="flex items-center gap-2 text-stone-400">
-            <span className="w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center text-[11px]">
-              4
-            </span>
-            <span className="hidden sm:inline">Konfirmasi</span>
-          </div>
-        </div>
-      </div>
 
       {/* MAIN CONTENT */}
       <main className="max-w-6xl w-full mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start flex-1">
@@ -307,7 +334,7 @@ export default function PaymentPage() {
               className="w-full bg-[#0F2334] hover:bg-[#19354d] disabled:bg-stone-400 text-white py-3.5 rounded text-xs font-semibold transition cursor-pointer"
             >
               {isSubmitting
-                ? "Memproses reservasi..."
+                ? "Memproses pembayaran..."
                 : `Bayar sekarang • ${formatRupiah(totalAmount)}`}
             </button>
           </div>
@@ -363,4 +390,12 @@ export default function PaymentPage() {
       </main>
     </div>
   );
-}   
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-xs">Memuat pembayaran...</div>}>
+      <PaymentContent />
+    </Suspense>
+  );
+}

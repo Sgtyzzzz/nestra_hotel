@@ -19,14 +19,26 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       if (!user.email) return false;
+      const email = user.email.trim().toLowerCase();
 
-      // Cek otomatis apakah Gmail yang login terdaftar di tabel Admin PostgreSQL
-      const allowedAdmin = await prisma.admin.findUnique({
-        where: { email: user.email.toLowerCase() },
-      });
+      const [existingGuest, internalAccount] = await Promise.all([
+        prisma.user.findUnique({ where: { email } }),
+        prisma.admin.findUnique({ where: { email } }),
+      ]);
 
-      if (!allowedAdmin) {
-        // Tolak jika bukan email admin terdaftar
+      // 1. Cegah bentrok: jika email sudah terdaftar sebagai customer di tabel User,
+      // tolak akses ke portal internal (STAFF / ADMIN)
+      if (existingGuest) {
+        return "/admin/login?error=RoleConflict";
+      }
+
+      // 2. Hanya izinkan email yang terdaftar di tabel Admin (dengan role STAFF atau ADMIN)
+      if (!internalAccount) {
+        return "/admin/login?error=AccessDenied";
+      }
+
+      const normalizedRole = internalAccount.role.toUpperCase();
+      if (normalizedRole !== "ADMIN" && normalizedRole !== "STAFF") {
         return "/admin/login?error=AccessDenied";
       }
 
@@ -34,11 +46,12 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user?.email) {
+        const email = user.email.trim().toLowerCase();
         const adminData = await prisma.admin.findUnique({
-          where: { email: user.email.toLowerCase() },
+          where: { email },
         });
         if (adminData) {
-          token.role = adminData.role;
+          token.role = adminData.role.toUpperCase(); // "STAFF" atau "ADMIN"
           token.adminId = adminData.id;
         }
       }
@@ -46,7 +59,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { role?: string }).role = token.role as string;
+        (session.user as { role?: string; adminId?: string }).role =
+          token.role as string;
+        (session.user as { role?: string; adminId?: string }).adminId =
+          token.adminId as string;
       }
       return session;
     },

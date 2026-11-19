@@ -33,6 +33,15 @@ interface RoomItem {
   isFull?: boolean;
 }
 
+function getLocalDateString(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function RoomsCatalogContent() {
   const searchParams = useSearchParams();
 
@@ -40,19 +49,19 @@ function RoomsCatalogContent() {
   const [loading, setLoading] = useState(true);
 
   const [checkIn, setCheckIn] = useState(
-    searchParams.get("checkIn") || "2026-10-16"
+    searchParams.get("checkIn") || getLocalDateString(0)
   );
   const [checkOut, setCheckOut] = useState(
-    searchParams.get("checkOut") || "2026-10-18"
+    searchParams.get("checkOut") || getLocalDateString(1)
   );
   const [guests, setGuests] = useState(searchParams.get("guests") || "2");
 
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedBed, setSelectedBed] = useState("ALL");
-  const [maxPrice, setMaxPrice] = useState(1250000);
+  const [maxPrice, setMaxPrice] = useState(3000000);
   const [sortBy, setSortBy] = useState("recommended");
 
-  const fetchRooms = async () => {
+  const fetchRooms = async (ci = checkIn, co = checkOut) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -60,6 +69,8 @@ function RoomsCatalogContent() {
       if (selectedBed !== "ALL") params.set("bedType", selectedBed);
       params.set("maxPrice", String(maxPrice));
       params.set("sort", sortBy);
+      if (ci) params.set("checkIn", ci);
+      if (co) params.set("checkOut", co);
 
       const res = await fetch(`/api/rooms?${params.toString()}`);
       if (res.ok) {
@@ -72,13 +83,22 @@ function RoomsCatalogContent() {
   };
 
   useEffect(() => {
-    fetchRooms();
-  }, [selectedCategory, selectedBed, maxPrice, sortBy]);
+    fetchRooms(checkIn, checkOut);
+  }, [selectedCategory, selectedBed, maxPrice, sortBy, checkIn, checkOut]);
+
+  const handleCheckInChange = (val: string) => {
+    setCheckIn(val);
+    if (val && checkOut && val >= checkOut) {
+      const nextDay = new Date(val);
+      nextDay.setDate(nextDay.getDate() + 1);
+      setCheckOut(nextDay.toISOString().slice(0, 10));
+    }
+  };
 
   const handleResetFilters = () => {
     setSelectedCategory("ALL");
     setSelectedBed("ALL");
-    setMaxPrice(1250000);
+    setMaxPrice(3000000);
     setSortBy("recommended");
   };
 
@@ -166,7 +186,7 @@ function RoomsCatalogContent() {
             <input
               type="date"
               value={checkIn}
-              onChange={(e) => setCheckIn(e.target.value)}
+              onChange={(e) => handleCheckInChange(e.target.value)}
               className="w-full border border-stone-200 rounded px-3 py-2 text-xs text-[#0F2334]"
             />
           </div>
@@ -177,6 +197,7 @@ function RoomsCatalogContent() {
             </label>
             <input
               type="date"
+              min={checkIn}
               value={checkOut}
               onChange={(e) => setCheckOut(e.target.value)}
               className="w-full border border-stone-200 rounded px-3 py-2 text-xs text-[#0F2334]"
@@ -217,7 +238,7 @@ function RoomsCatalogContent() {
 
           <button
             type="button"
-            onClick={fetchRooms}
+            onClick={() => fetchRooms(checkIn, checkOut)}
             className="w-full bg-[#0F2334] hover:bg-[#19354d] text-white text-xs font-semibold py-2.5 px-4 rounded transition cursor-pointer"
           >
             Perbarui pencarian
@@ -301,7 +322,7 @@ function RoomsCatalogContent() {
               <input
                 type="range"
                 min={600000}
-                max={1250000}
+                max={3000000}
                 step={50000}
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}

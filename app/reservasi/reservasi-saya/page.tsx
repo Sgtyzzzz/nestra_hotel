@@ -17,6 +17,7 @@ interface BookingRecord {
   adults: number;
   totalAmount: number;
   status: BookingStatus;
+  paymentStatus: "PENDING" | "PAID" | "REFUNDED";
   paymentMethod: string | null;
   room: {
     slug: string;
@@ -30,16 +31,22 @@ export default function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"ALL" | BookingStatus>("ALL");
   const [cancellingCode, setCancellingCode] = useState<string | null>(null);
+  const [searchEmail, setSearchEmail] = useState("aditya.pratama@email.id");
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (targetEmail?: string) => {
     setLoading(true);
     try {
-      const savedGuest = sessionStorage.getItem("nestra_booking_guest");
-      let email = "aditya.pratama@email.id";
-      if (savedGuest) {
-        const parsed = JSON.parse(savedGuest);
-        if (parsed.email) email = parsed.email;
+      let email: string = targetEmail || "";
+      if (!email) {
+        const savedGuest = sessionStorage.getItem("nestra_booking_guest");
+        email = "aditya.pratama@email.id";
+        if (savedGuest) {
+          const parsed = JSON.parse(savedGuest);
+          if (parsed.email) email = String(parsed.email);
+        }
       }
+
+      setSearchEmail(email);
 
       const res = await fetch(
         `/api/bookings?email=${encodeURIComponent(email)}`
@@ -59,6 +66,17 @@ export default function MyBookingsPage() {
     fetchBookings();
   }, []);
 
+  const handleEmailSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = searchEmail.trim().toLowerCase();
+    if (!clean) return;
+    sessionStorage.setItem(
+      "nestra_booking_guest",
+      JSON.stringify({ email: clean })
+    );
+    fetchBookings(clean);
+  };
+
   const handleCancelBooking = async (bookingCode: string) => {
     const confirmed = window.confirm(
       `Apakah Anda yakin ingin membatalkan reservasi ${bookingCode}?`
@@ -71,7 +89,7 @@ export default function MyBookingsPage() {
         method: "PATCH",
       });
       if (res.ok) {
-        await fetchBookings();
+        await fetchBookings(searchEmail);
       }
     } finally {
       setCancellingCode(null);
@@ -106,32 +124,38 @@ export default function MyBookingsPage() {
     return `${start} – ${end}`;
   };
 
-  const getStatusInfo = (status: BookingStatus) => {
-    switch (status) {
-      case "UPCOMING":
-        return {
-          label: "Akan datang",
-          style: "bg-emerald-50 text-emerald-700 border-emerald-200",
-        };
-      case "COMPLETED":
-        return {
-          label: "Selesai",
-          style: "bg-stone-100 text-stone-700 border-stone-200",
-        };
-      case "CANCELLED":
-        return {
-          label: "Dibatalkan",
-          style: "bg-red-50 text-red-700 border-red-200",
-        };
+  const getStatusInfo = (booking: BookingRecord) => {
+    if (booking.status === "CANCELLED") {
+      return {
+        label: "Dibatalkan",
+        style: "bg-red-50 text-red-700 border-red-200",
+      };
     }
+    if (booking.paymentStatus !== "PAID") {
+      return {
+        label: "Menunggu pembayaran",
+        style: "bg-amber-50 text-amber-700 border-amber-200",
+      };
+    }
+    if (booking.status === "COMPLETED") {
+      return {
+        label: "Selesai",
+        style: "bg-stone-100 text-stone-700 border-stone-200",
+      };
+    }
+    return {
+      label: "Akan datang",
+      style: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
   };
 
-  const guestName =
-    bookings[0]
-      ? `${bookings[0].guestFirstName} ${bookings[0].guestLastName}`.trim()
-      : "Aditya Pratama";
-  const guestEmail = bookings[0]?.guestEmail || "aditya.pratama@email.id";
-  const firstName = bookings[0]?.guestFirstName || "Aditya";
+  const guestName = bookings[0]
+    ? `${bookings[0].guestFirstName} ${
+        bookings[0].guestLastName === "-" ? "" : bookings[0].guestLastName
+      }`.trim()
+    : "Tamu Nestra";
+  const guestEmail = bookings[0]?.guestEmail || searchEmail;
+  const firstName = bookings[0]?.guestFirstName || "Tamu";
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F6F2] text-[#1A202C]">
@@ -165,14 +189,14 @@ export default function MyBookingsPage() {
             <Link href="/penawaran" className="hover:text-[#0F2334] transition">
               Penawaran
             </Link>
-            <Link href="/kontak" className="hover:text-[#0F2334] transition">
+            <Link href="/bantuan" className="hover:text-[#0F2334] transition">
               Hubungi kami
             </Link>
           </nav>
 
           <div className="flex items-center gap-5 text-sm">
             <Link
-              href="/reservasi-saya"
+              href="/reservasi/reservasi-saya"
               className="hidden sm:inline text-[#0F2334] font-semibold"
             >
               Reservasi saya
@@ -211,28 +235,57 @@ export default function MyBookingsPage() {
                   <h2 className="text-xs font-bold text-[#0F2334]">
                     {guestName}
                   </h2>
-                  <p className="text-[11px] text-stone-400">{guestEmail}</p>
+                  <p className="text-[11px] text-stone-400 break-all">
+                    {guestEmail}
+                  </p>
                 </div>
               </div>
 
+              {/* FORM GANTI / CARI EMAIL RESERVASI */}
+              <form
+                onSubmit={handleEmailSearch}
+                className="pt-4 border-t border-stone-100 space-y-2"
+              >
+                <label className="block text-[11px] font-semibold text-[#0F2334]">
+                  Cek reservasi via email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  placeholder="Masukkan email pemesan"
+                  className="w-full px-3 py-2 text-xs border border-stone-200 rounded focus:outline-none focus:border-[#0F2334]"
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-[#0F2334] hover:bg-[#19354d] text-white py-2 rounded text-xs font-medium transition cursor-pointer"
+                >
+                  Tampilkan reservasi
+                </button>
+              </form>
+
               <nav className="pt-4 border-t border-stone-100 space-y-2.5 text-xs">
                 <Link
-                  href="/reservasi-saya"
+                  href="/reservasi/reservasi-saya"
                   className="block font-bold text-[#0F2334]"
                 >
                   Reservasi saya
                 </Link>
                 <Link
-                  href="/kontak"
+                  href="/bantuan"
                   className="block text-stone-500 hover:text-[#0F2334]"
                 >
-                  Bantuan & perubahan jadwal
+                  Bantuan &amp; perubahan jadwal
                 </Link>
               </nav>
             </div>
 
-            <div className="bg-white p-5 rounded-md border border-stone-200/90 space-y-1.5">
-              <h3 className="font-serif text-base text-[#0F2334]">
+            <Link
+              href="/bantuan"
+              className="block bg-white hover:border-[#0F2334] p-5 rounded-md border border-stone-200/90 space-y-1.5 transition group"
+            >
+              <h3 className="font-serif text-base text-[#0F2334] group-hover:underline">
                 Butuh bantuan?
               </h3>
               <p className="text-[11px] text-stone-500 leading-relaxed">
@@ -241,7 +294,10 @@ export default function MyBookingsPage() {
               <p className="text-xs font-bold text-[#0F2334] pt-1">
                 +62 274 582 100
               </p>
-            </div>
+              <span className="inline-block text-[11px] font-semibold text-[#B8893E] pt-1">
+                Kirim pesan / aduan →
+              </span>
+            </Link>
           </aside>
 
           {/* RIGHT CONTENT */}
@@ -280,7 +336,7 @@ export default function MyBookingsPage() {
             ) : filteredBookings.length === 0 ? (
               <div className="bg-white p-8 rounded-md border border-stone-200 text-center space-y-3">
                 <p className="text-xs text-stone-500">
-                  Belum ada reservasi pada kategori ini.
+                  Belum ada reservasi untuk email <strong>{searchEmail}</strong>.
                 </p>
                 <Link
                   href="/kamar"
@@ -292,7 +348,11 @@ export default function MyBookingsPage() {
             ) : (
               <div className="space-y-4">
                 {filteredBookings.map((booking) => {
-                  const statusInfo = getStatusInfo(booking.status);
+                  const statusInfo = getStatusInfo(booking);
+                  const isUnpaid =
+                    booking.status === "UPCOMING" &&
+                    booking.paymentStatus !== "PAID";
+
                   return (
                     <div
                       key={booking.id}
@@ -331,7 +391,7 @@ export default function MyBookingsPage() {
                                 booking.checkIn,
                                 booking.checkOut
                               )}{" "}
-                              • {booking.nights} malam
+                              - {booking.nights} malam
                             </p>
                             <p className="text-[11px] text-stone-400 mt-0.5">
                               {booking.room.name} • {booking.adults} dewasa • 1
@@ -343,11 +403,15 @@ export default function MyBookingsPage() {
                             className={`text-[11px] mt-3 font-medium ${
                               booking.status === "CANCELLED"
                                 ? "text-stone-400"
+                                : isUnpaid
+                                ? "text-amber-700"
                                 : "text-emerald-700"
                             }`}
                           >
                             {booking.status === "CANCELLED"
-                              ? "Reservasi dibatalkan • Dana dikembalikan"
+                              ? "Reservasi dibatalkan"
+                              : isUnpaid
+                              ? "Belum dibayar • Selesaikan pembayaran untuk konfirmasi"
                               : `Lunas • ${
                                   booking.paymentMethod || "BCA Virtual Account"
                                 }`}
@@ -369,12 +433,21 @@ export default function MyBookingsPage() {
                           <div className="mt-4 flex flex-col md:items-end gap-2 w-full md:w-auto">
                             {booking.status === "UPCOMING" && (
                               <>
-                                <Link
-                                  href={`/reservasi/konfirmasi?code=${booking.bookingCode}`}
-                                  className="bg-[#0F2334] hover:bg-[#19354d] text-white px-4 py-2 rounded text-xs font-medium transition text-center"
-                                >
-                                  Lihat bukti
-                                </Link>
+                                {isUnpaid ? (
+                                  <Link
+                                    href={`/reservasi/pembayaran?code=${booking.bookingCode}`}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded text-xs font-medium transition text-center"
+                                  >
+                                    Bayar sekarang
+                                  </Link>
+                                ) : (
+                                  <Link
+                                    href={`/reservasi/konfirmasi?code=${booking.bookingCode}`}
+                                    className="bg-[#0F2334] hover:bg-[#19354d] text-white px-4 py-2 rounded text-xs font-medium transition text-center"
+                                  >
+                                    Lihat bukti
+                                  </Link>
+                                )}
                                 <button
                                   type="button"
                                   disabled={

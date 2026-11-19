@@ -15,6 +15,7 @@ enum BookingStatus {
 }
 
 enum PaymentStatus {
+  PENDING
   UNPAID
   PAID
   REFUNDED
@@ -119,4 +120,27 @@ model Admin {
   name      String
   role      String   @default("STAFF")
   createdAt DateTime @default(now())
+}
+
+model RoomUnit {
+  id         String   @id @default(cuid())
+  roomNumber String   @unique // "101" s/d "320"
+  floor      Int      // 1, 2, 3
+  category   String   // "Superior" | "Deluks"
+  status     String   @default("READY") // READY | OCCUPIED | DIRTY | MAINTENANCE
+  updatedAt  DateTime @updatedAt
+}
+
+model IncidentReport {
+  id          String   @id @default(cuid())
+  ticketCode  String   @unique // contoh: "KDL-032"
+  title       String
+  roomNumber  String?
+  guestName   String?
+  description String
+  priority    String   @default("NORMAL") // NORMAL | HIGH | URGENT
+  status      String   @default("OPEN")   // OPEN | ESCALATED | RESOLVED
+  reportedBy  String   @default("Dimas Saputra")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
